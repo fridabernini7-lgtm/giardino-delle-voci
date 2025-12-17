@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Giardino delle Voci — Zero‑App PoC (pre‑trained model)</title>
+  <style>
+    :root {
+      --bg: #faf8f5; --ink: #1f2937; --muted:#6b7280; --surface:#ffffff;
+      --accent:#4f8a8b; --accent-2:#a7727d; --ok:#3a9159; --warn:#e2a21a; --err:#c44242;
+      --shadow: 0 10px 30px rgba(0,0,0,.08); --radius:18px;
+    }
+    html, body { height:100%; }
+    body { margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans"; color:var(--ink); background:var(--bg); -webkit-font-smoothing: antialiased;}
+    .wrap { max-width:1100px; padding:28px; margin:0 auto; }
+    header { display:grid; grid-template-columns:1fr auto; gap:16px; align-items:end; margin-bottom:16px; }
+    h1 { font-size:28px; line-height:1.2; margin:0; }
+    .sub { color:var(--muted); font-size:14px; }
+    .card { background:var(--surface); border-radius:var(--radius); box-shadow:var(--shadow); overflow:hidden; }
+    .grid { display:grid; gap:18px; grid-template-columns:1fr; }
+    @media (min-width:980px){ .grid { grid-template-columns: 1.2fr .8fr; }}
+
+    .panel { padding:18px; }
+    .videoShell { position:relative; background:#0b0f14; border-radius:14px; overflow:hidden; aspect-ratio:16/10; }
+    video, canvas { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+    video { background:#000; }
+    canvas { mix-blend-mode: lighten; pointer-events:none; }
+
+    .toolbar { display:flex; flex-wrap:wrap; gap:10px; margin-top:14px; }
+    button, .btn { appearance:none; border:0; border-radius:12px; padding:10px 14px; font-weight:600; cursor:pointer; background:var(--ink); color:#fff; box-shadow:var(--shadow); }
+    button.secondary { background:var(--accent); }
+    button.ghost { background:#eef1f3; color:#24313f; }
+    button.warn { background:var(--warn); color:#232323; }
+    button.ok { background:var(--ok); }
+    button:disabled { opacity:.55; cursor:not-allowed; }
+
+    .badge { display:inline-flex; align-items:center; gap:8px; background:#eef6f6; color:#155; border-radius:999px; padding:6px 10px; font-size:12px; font-weight:600; }
+    .row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+    .kpi { display:grid; grid-template-columns:auto 1fr auto; gap: 8px 12px; align-items:center; }
+    .kpi strong { font-size:13px; }
+    .meter { height:8px; background:#e9edf0; border-radius:999px; overflow:hidden; min-width:220px; }
+    .meter > i { display:block; height:100%; width:0%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); transition: width .25s ease; }
+
+    .bins { display:grid; grid-template-columns: repeat(2, 1fr); gap:12px; margin-top:14px; }
+    @media (min-width:720px){ .bins { grid-template-columns: repeat(4, 1fr);} }
+    .bin { background:#f4f6f8; border-radius:14px; padding:12px; display:grid; gap:8px; }
+    .bin h4 { margin:0; font-size:14px; }
+    .bin small{ color:var(--muted); }
+
+    .log { background:#0f141a; color:#d9e2ea; padding:14px; border-radius:12px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; font-size:12px; height:160px; overflow:auto; }
+    .pill { display:inline-block; padding:4px 8px; border-radius:999px; background:#ecf0f3; font-size:12px; }
+    footer { color:var(--muted); font-size:12px; margin-top:18px; }
+    .hint { font-size:13px; color:var(--muted); }
+    .help { background:#fff6e5; color:#5b3b00; border:1px dashed #e8b86a; padding:10px 12px; border-radius:12px; font-size:12px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>Giardino delle Voci — PoC "Zero‑App" (pre‑trained)</h1>
+        <p class="sub">Inquadra il personaggio con la fotocamera: un modello pre‑addestrato lo riconosce in locale e ne attiva la voce. Nessuna app nativa.</p>
+      </div>
+      <div class="row">
+        <span class="badge">🎥 Camera <b id="camState">non attiva</b></span>
+        <span class="badge">🤖 Modello <b id="mlState">non caricato</b></span>
+        <span class="badge">🔒 Connessione <b id="secState">—</b></span>
+        <span class="badge">📱 iOS <b id="iosState">—</b></span>
+      </div>
+    </header>
+
+    <section class="grid">
+      <!-- Left: camera + controls -->
+      <div class="card panel">
+        <div class="videoShell">
+          <video id="cam" playsinline autoplay muted></video>
+          <canvas id="overlay"></canvas>
+        </div>
+        <div class="toolbar">
+          <button id="btnStart" class="ok">Avvia fotocamera</button>
+          <button id="btnRun" disabled>Riconoscimento continuo</button>
+          <button id="btnStop" class="warn" disabled>Ferma</button>
+          <button id="btnDiag" class="ghost">Autotest & Diagnostica</button>
+        </div>
+
+        <div class="help" id="httpsHint" style="display:none; margin-top:10px;">
+          <strong>HTTPS richiesto:</strong> per usare la fotocamera su iPhone/iPad e su molti Android, apri questa pagina su un URL <b>https://</b> (oppure in locale <code>http://localhost</code>). Se hai negato il permesso in passato, vai nelle impostazioni del browser e consenti l'accesso alla fotocamera per questo sito.
+          <br/><br/>
+          <strong>Modello pre‑addestrato:</strong> il codice usa un modello di Teachable Machine o ml5. Sostituisci <code>MODEL_URL</code> con l'URL del tuo modello (es. <code>https://teachablemachine.withgoogle.com/models/XXXX/model.json</code>) con le classi "Lina", "Nuna", "Timo", "Sofi".
+        </div>
+
+        <div class="bins">
+          <div class="bin">
+            <h4>🌿 Lina (Foglia)</h4>
+            <small>Classe: <b>Lina</b></small>
+          </div>
+          <div class="bin">
+            <h4>💧 Nuna (Goccia)</h4>
+            <small>Classe: <b>Nuna</b></small>
+          </div>
+          <div class="bin">
+            <h4>🪨 Timo (Sasso)</h4>
+            <small>Classe: <b>Timo</b></small>
+          </div>
+          <div class="bin">
+            <h4>🌱 Sofi (Radice)</h4>
+            <small>Classe: <b>Sofi</b></small>
+          </div>
+        </div>
+
+        <div style="margin-top:14px" class="kpi">
+          <strong>Confidenza</strong>
+          <div class="meter"><i id="meter"></i></div>
+          <span id="conf" class="pill">0%</span>
+        </div>
+      </div>
+
+      <!-- Right: narration + logs -->
+      <div class="card panel">
+        <h3 style="margin-top:0">Voce del personaggio</h3>
+        <p class="hint">Quando il sistema riconosce una classe sopra soglia, parla con la voce sintetica del browser. Per i dispositivi iOS potrebbe essere necessario un primo <em>tap</em> su un pulsante per sbloccare l'audio.</p>
+        <div id="say" class="log" aria-live="polite"></div>
+
+        <div style="margin-top:14px">
+          <h4>Fallback (senza camera)</h4>
+          <div class="toolbar">
+            <button class="ghost quick" data-id="Lina">Parla: Lina</button>
+            <button class="ghost quick" data-id="Nuna">Parla: Nuna</button>
+            <button class="ghost quick" data-id="Timo">Parla: Timo</button>
+            <button class="ghost quick" data-id="Sofi">Parla: Sofi</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <p>PoC didattico: riconoscimento in‑browser con <span class="pill">ml5.js + modello pre‑addestrato</span>. Nessuna app nativa. Per produzione: TTS cloud e contenuti su infrastruttura UE.</p>
+    </footer>
+  </div>
+
+  <!-- Libraries (CDN) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ml5/0.12.2/ml5.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+  <script>
+    // --------------------
+    // Configurazione PoC (modello pre‑addestrato)
+    // --------------------
+    // Sostituisci questo URL con il tuo modello Teachable Machine / ml5
+    // Assicurati che le classi nel modello si chiamino esattamente: Lina, Nuna, Timo, Sofi
+    const MODEL_URL = 'https://teachablemachine.withgoogle.com/models/XXXX/model.json';
+
+    const CLASSES = {
+      Lina: { label: 'Lina', icon: '🌿', script: [
+        'Ciao, sono Lina la Foglia. Oggi ho danzato con il vento.',
+        'Se chiudi gli occhi, senti il fruscio degli alberi?' ] },
+      Nuna: { label: 'Nuna', icon: '💧', script: [
+        'Io sono Nuna, una goccia in viaggio. Ti va di ascoltare il mio canto?',
+        'Quando piove, ogni pozzanghera è uno specchio di cielo.' ] },
+      Timo: { label: 'Timo', icon: '🪨', script: [
+        'Sono Timo, un sasso paziente. Rimani qui con me per un respiro.',
+        'Le storie più lunghe hanno passi piccolissimi.' ] },
+      Sofi: { label: 'Sofi', icon: '🌱', script: [
+        'Io sono Sofi, una radice che ascolta. Cosa vuoi coltivare oggi?',
+        'Le radici parlano piano, ma ricordano tutto.' ] },
+    };
+
+    const CLASS_KEYS = Object.keys(CLASSES);
+
+    // Stato UI
+    let recognizing = false;
+    let synthLock = false; // per non sovrapporre voci
+
+    // Riferimenti DOM
+    const cam = document.getElementById('cam');
+    const overlay = document.getElementById('overlay');
+    const meter = document.getElementById('meter');
+    const confEl = document.getElementById('conf');
+    const camState = document.getElementById('camState');
+    const mlState = document.getElementById('mlState');
+    const secState = document.getElementById('secState');
+    const iosState = document.getElementById('iosState');
+    const httpsHint = document.getElementById('httpsHint');
+    const sayBox = document.getElementById('say');
+
+    // Classifier ml5 pre‑addestrato
+    let classifier = null;
+
+    // ----------
+    // Diagnostica
+    // ----------
+    function isIOS(){ return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); }
+    function isSecure(){ return window.isSecureContext || location.hostname === 'localhost' || location.hostname === '127.0.0.1'; }
+
+    async function permissionsSnapshot(){
+      const out = {};
+      try{ out.mediaDevices = !!navigator.mediaDevices; }catch{ out.mediaDevices=false; }
+      try{ out.getUserMedia = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia); }catch{ out.getUserMedia=false; }
+      try{ out.permissions = !!navigator.permissions; }catch{ out.permissions=false; }
+      if(out.permissions){
+        try{ const st = await navigator.permissions.query({ name: 'camera' }); out.cameraPerm = st.state; }catch{ out.cameraPerm = 'unknown'; }
+      }
+      return out;
+    }
+
+    function log(msg){ const t = new Date().toLocaleTimeString(); sayBox.innerHTML = `[${t}] ${msg}<br>` + sayBox.innerHTML; }
+
+    async function runDiagnostics(){
+      const diag = await permissionsSnapshot();
+      log(`🔎 Diagnostica — secure:${isSecure()} | iOS:${isIOS()} | mediaDevices:${diag.mediaDevices} | getUserMedia:${diag.getUserMedia} | cameraPerm:${diag.cameraPerm||'n/a'}`);
+      if(!isSecure()){
+        httpsHint.style.display = 'block';
+        log('⚠️ Connessione non sicura. Usa HTTPS oppure http://localhost per abilitare la camera.');
+      }
+      if(diag.cameraPerm === 'denied'){
+        log('🚫 Permesso camera NEGATO: apri le impostazioni del browser e consenti la fotocamera per questo sito.');
+      }
+      if(!diag.getUserMedia){ log('⚠️ getUserMedia non disponibile in questo contesto.'); }
+    }
+
+    // --------------
+    // Avvio fotocamera
+    // --------------
+    async function startCamera(){
+      secState.textContent = isSecure() ? 'sicura' : 'non sicura';
+      iosState.textContent = isIOS() ? 'iOS rilevato' : '—';
+      if(!isSecure()){
+        httpsHint.style.display = 'block';
+        log('⚠️ Per la camera è richiesto HTTPS (o localhost).');
+      }
+      if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+        camState.textContent = 'non disponibile';
+        log('⚠️ API mediaDevices/getUserMedia non disponibili in questo browser/contesto.');
+        return;
+      }
+
+      try{
+        const constraintsEnv = { video: { facingMode: { exact: 'environment' } }, audio:false };
+        const stream = await navigator.mediaDevices.getUserMedia(constraintsEnv).catch(async err => {
+          log('↩️ Fallback: uso facingMode:"user" (camera frontale)');
+          return navigator.mediaDevices.getUserMedia({ video:{ facingMode:'user' }, audio:false });
+        });
+
+        cam.srcObject = stream;
+        await cam.play();
+        camState.textContent = 'attiva';
+        cam.addEventListener('loadedmetadata', () => {
+          overlay.width = cam.videoWidth;
+          overlay.height = cam.videoHeight;
+        }, { once:true });
+
+        setupPretrainedModel();
+      }catch(err){
+        camState.textContent = 'errore camera';
+        handleCameraError(err);
+      }
+    }
+
+    function handleCameraError(err){
+      console.error(err);
+      const name = err && (err.name || err.code) || 'Error';
+      if(name === 'NotAllowedError' || name === 'SecurityError'){
+        log('🚫 Accesso fotocamera negato/bloccato.');
+        if(!isSecure()){ log('👉 Abilita HTTPS (o usa http://localhost) e riprova.'); }
+        log('👉 Controlla i permessi del browser per questo sito e consenti la fotocamera.');
+        log('👉 Su iOS, apri in Safari con HTTPS, poi concedi il permesso quando richiesto.');
+      } else if(name === 'NotFoundError' || name === 'OverconstrainedError'){
+        log('📷 Nessuna fotocamera disponibile o vincolo non soddisfatto.');
+      } else {
+        log(`⚠️ Errore fotocamera: ${name}.`);
+      }
+      log('Usa i pulsanti Fallback per testare l\'audio finché i permessi non sono concessi.');
+    }
+
+    // ----------------------
+    // Modello pre‑addestrato
+    // ----------------------
+    function setupPretrainedModel(){
+      if(classifier) return;
+      if(!MODEL_URL || MODEL_URL.includes('XXXX')){
+        log('⚠️ MODEL_URL non impostato: sostituisci l\'URL con quello del tuo modello Teachable Machine.');
+        return;
+      }
+      log('⏳ Caricamento modello pre‑addestrato…');
+      classifier = ml5.imageClassifier(MODEL_URL, cam, () => {
+        mlState.textContent = 'pre‑addestrato pronto';
+        log('✅ Modello caricato. Premi "Riconoscimento continuo" per iniziare.');
+        document.getElementById('btnRun').disabled = false;
+      });
+    }
+
+    // -----------------
+    // Riconoscimento live
+    // -----------------
+    function run(){
+      if(!classifier){ log('⏳ Modello non ancora pronto.'); return; }
+      recognizing = true;
+      document.getElementById('btnStop').disabled = false;
+      document.getElementById('btnRun').disabled = true;
+      loopClassify();
+    }
+
+    function stop(){
+      recognizing = false;
+      document.getElementById('btnRun').disabled = false;
+      document.getElementById('btnStop').disabled = true;
+    }
+
+    function loopClassify(){
+      if(!recognizing || !classifier) return;
+      classifier.classify((err, result) => {
+        if(err){ console.error(err); requestAnimationFrame(loopClassify); return; }
+        if(!result || !result[0]){ requestAnimationFrame(loopClassify); return; }
+        // Teachable Machine tipicamente restituisce { label: 'Lina', confidence: 0.97 }
+        const rawLabel = String(result[0].label || '').trim();
+        const confidence = result[0].confidence != null ? result[0].confidence : (result[0].probability || 0);
+        updateMeter(confidence);
+
+        // Normalizza etichette (es. "Class 1: Lina" → "Lina")
+        let label = rawLabel;
+        CLASS_KEYS.forEach(k => {
+          if(rawLabel.toLowerCase().includes(k.toLowerCase())) label = k;
+        });
+
+        if(confidence > 0.85 && CLASSES[label]){
+          speakOnce(label, confidence);
+        }
+        requestAnimationFrame(loopClassify);
+      });
+    }
+
+    function updateMeter(p){
+      const pct = Math.max(0, Math.min(1, p));
+      meter.style.width = (pct*100).toFixed(0)+'%';
+      confEl.textContent = (pct*100).toFixed(0)+'%';
+    }
+
+    // -----------------
+    // Voce del personaggio
+    // -----------------
+    function speakOnce(label, conf){
+      if(synthLock) return; synthLock = true;
+      const c = CLASSES[label];
+      if(!c){ synthLock = false; return; }
+      const line = c.script[Math.floor(Math.random()*c.script.length)];
+      log(`${c.icon} <${c.label}> (${(conf*100).toFixed(0)}%): ${line}`);
+      speak(`${c.label} dice: ${line}`);
+      setTimeout(()=>{ synthLock = false; }, 3500);
+    }
+
+    function speak(text){
+      if(!('speechSynthesis' in window)){
+        log('🔈 Sintesi vocale non supportata in questo browser.');
+        return;
+      }
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = 'it-IT';
+      u.rate = 0.95;
+      u.pitch = 1.0;
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(u);
+    }
+
+    // Wiring eventi
+    document.getElementById('btnStart').addEventListener('click', startCamera, { passive:true });
+    document.getElementById('btnRun').addEventListener('click', run, { passive:true });
+    document.getElementById('btnStop').addEventListener('click', stop, { passive
