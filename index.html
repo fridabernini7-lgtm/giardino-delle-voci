@@ -239,19 +239,64 @@
     // Model loading (pre‑trained)
     // -----------------------------
     async function loadModel(){
-      const url = (modelUrlInput.value || '').trim();
-      if(!url || !url.startsWith('https://')){
-        log('⚠️ Inserisci un MODEL_URL valido (https://…/model.json).');
+      let url = (modelUrlInput.value || '').trim();
+      if(!url){
+        log('⚠️ Inserisci l’URL del modello (Teachable Machine).');
         return;
       }
       if(!stream){
         log('⚠️ Avvia prima la camera.');
         return;
       }
+      // Accetta anche URL base del modello (…/models/XXXX/) e normalizza a …/model.json
+      if(url.endsWith('/')) url = url.slice(0,-1);
+      if(!url.endsWith('model.json')){
+        // se è un link base del modello TM, aggiungi /model.json
+        url = url + '/model.json';
+      }
+      if(!url.startsWith('https://')){
+        log('⚠️ Il MODEL_URL deve iniziare con https:// (iOS richiede contesto sicuro).');
+        return;
+      }
+
+      mlState.textContent = 'verifica…';
+      setBadge(runState, 'checking');
+      log('🔎 Verifica accessibilità model.json…');
+
+      // Verifica che il file sia raggiungibile e abbia struttura plausibile TFJS
+      try{
+        const res = await fetch(url, { method: 'GET', cache: 'no-store' });
+        if(!res.ok){
+          mlState.textContent = 'errore';
+          setBadge(runState, 'error');
+          log(`❌ model.json non raggiungibile (HTTP ${res.status}). Apri l’URL in un tab: deve mostrarti JSON.`);
+          return;
+        }
+        const txt = await res.text();
+        let js;
+        try{ js = JSON.parse(txt); }catch(e){
+          mlState.textContent = 'errore';
+          setBadge(runState, 'error');
+          log('❌ Il file non è JSON valido. Assicurati di usare Export → TensorFlow.js e l’URL che termina con /model.json.');
+          return;
+        }
+        const looksTfjs = !!(js.modelTopology || js.weightsManifest);
+        if(!looksTfjs){
+          mlState.textContent = 'errore';
+          setBadge(runState, 'error');
+          log('❌ Questo JSON non sembra un modello TensorFlow.js (mancano modelTopology/weightsManifest). Ri-esporta da Teachable Machine come TensorFlow.js (Image Project).');
+          return;
+        }
+      } catch (e){
+        mlState.textContent = 'errore';
+        setBadge(runState, 'error');
+        log(`❌ Impossibile scaricare model.json (rete/CORS). Dettaglio: ${e.message || e}`);
+        return;
+      }
 
       mlState.textContent = 'caricamento…';
       setBadge(runState, 'loading');
-      log('🤖 Caricamento modello…');
+      log('🤖 Caricamento modello (ml5.imageClassifier)…');
 
       try{
         classifier = ml5.imageClassifier(url, video, () => {
@@ -260,10 +305,10 @@
           log('✅ Modello caricato.');
           runBtn.disabled = false;
         });
-      }catch(err){
+      } catch (err){
         mlState.textContent = 'errore';
         setBadge(runState, 'error');
-        log(`❌ Errore modello: ${err.name || err}`);
+        log(`❌ Errore durante l’inizializzazione del modello: ${err.name || err}`);
         console.error(err);
       }
     }
