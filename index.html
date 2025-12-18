@@ -136,13 +136,17 @@
     </footer>
   </div>
 
-  <!-- TensorFlow.js first (ml5 depends on it in many builds) -->
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-  <!-- ml5.js -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/ml5/0.12.2/ml5.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <!-- TFJS + ml5 are loaded on-demand (after camera works) to avoid breaking camera on iOS if a CDN is blocked. -->
   <script>
     // -----------------------------
     // Giardino delle Voci — runtime
+    // Robust error logging (so a JS error never looks like a “camera problem”)
+    window.addEventListener('error', (e) => {
+      try{ log(`💥 JS error: ${e.message || e.error || 'unknown'}`); }catch{}
+    });
+    window.addEventListener('unhandledrejection', (e) => {
+      try{ log(`💥 Promise rejection: ${e.reason?.message || e.reason || 'unknown'}`); }catch{}
+    });
     // -----------------------------
     const video = document.getElementById('video');
     const logEl = document.getElementById('log');
@@ -178,6 +182,43 @@
     // Runtime state
     let stream = null;
     let classifier = null;
+    let libsReady = false;
+
+    const TFJS_URL = 'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js';
+    const ML5_URL  = 'https://cdnjs.cloudflare.com/ajax/libs/ml5/0.12.2/ml5.min.js';
+
+    function loadScriptOnce(src){
+      return new Promise((resolve, reject) => {
+        const already = [...document.scripts].some(s => s.src && s.src === src);
+        if(already){ resolve(); return; }
+        const s = document.createElement('script');
+        s.src = src;
+        s.async = true;
+        s.crossOrigin = 'anonymous';
+        s.referrerPolicy = 'no-referrer';
+        s.onload = () => resolve();
+        s.onerror = () => reject(new Error('Failed to load ' + src));
+        document.head.appendChild(s);
+      });
+    }
+
+    async function ensureMlLibs(){
+      if(libsReady) return true;
+      log('📦 Caricamento librerie ML (tfjs + ml5)…');
+      try{
+        await loadScriptOnce(TFJS_URL);
+        log(`… tfjs ${(typeof window.tf !== 'undefined') ? 'OK' : 'MISSING'}`);
+        await loadScriptOnce(ML5_URL);
+        log(`… ml5 ${(typeof window.ml5 !== 'undefined') ? 'OK' : 'MISSING'}`);
+        libsReady = (typeof window.tf !== 'undefined') && (typeof window.ml5 !== 'undefined');
+        if(!libsReady) throw new Error('tfjs/ml5 missing after load');
+        return true;
+      }catch(e){
+        libsReady = false;
+        log(`❌ Impossibile caricare le librerie ML (CDN bloccato?). Dettaglio: ${e.message}`);
+        return false;
+      }
+    }
     let recognizing = false;
     let synthLock = false;
     let lastSpokenLabel = null;
@@ -259,6 +300,14 @@
       }
       if(!url.startsWith('https://')){
         log('⚠️ Il MODEL_URL deve iniziare con https:// (iOS richiede contesto sicuro).');
+        return;
+      }
+
+      // Ensure ML libraries are available (camera must keep working even if this fails)
+      const okLibs = await ensureMlLibs();
+      if(!okLibs){
+        mlState.textContent = 'errore';
+        setBadge(runState, 'error');
         return;
       }
 
@@ -425,12 +474,8 @@
     // -----------------------------
     function selfCheck(){
       const secure = window.isSecureContext;
-      const hasTF = (typeof window.tf !== 'undefined');
-      const hasML5 = (typeof window.ml5 !== 'undefined');
-      log(`🧪 Self-check: secureContext=${secure} | mediaDevices=${!!navigator.mediaDevices} | speech=${'speechSynthesis' in window} | tfjs=${hasTF} | ml5=${hasML5}`);
+      log(`🧪 Self-check: secureContext=${secure} | mediaDevices=${!!navigator.mediaDevices} | speech=${'speechSynthesis' in window}`);
       if(!secure){ log('⚠️ Attenzione: il contesto non è sicuro. Su iOS la camera richiede HTTPS.'); }
-      if(!hasTF){ log('⚠️ TensorFlow.js non caricato (tf è undefined).'); }
-      if(!hasML5){ log('⚠️ ml5 non caricato (ml5 è undefined).'); }
     }
 
     // Wiring
