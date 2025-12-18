@@ -126,6 +126,12 @@
   </div>
 
   <script>
+    // =============================
+    // Giardino delle Voci — Zero-App
+    // Release: 0.9.7
+    // Engine: Teachable Machine Image (tmImage) + TFJS (pinned)
+    // =============================
+
     // -----------------------------
     // Robust logging (avoid “silent” failures)
     // -----------------------------
@@ -140,6 +146,14 @@
     window.addEventListener('unhandledrejection', (e) => {
       try{ log(`💥 Promise rejection: ${e.reason?.message || e.reason || 'unknown'}`); }catch{}
     });
+
+    // -----------------------------
+    // Release badge
+    // -----------------------------
+    const RELEASE = '0.9.7';
+    const BUILD_TIME = new Date().toISOString();
+    const vb = document.getElementById('versionBadge');
+    if(vb){ vb.textContent = `🧾 v${RELEASE}`; vb.title = `Build ${BUILD_TIME}`; }
 
     // -----------------------------
     // UI refs
@@ -179,38 +193,50 @@
     const CLASS_KEYS = Object.keys(CLASSES);
 
     // -----------------------------
+    // Helpers
+    // -----------------------------
+    function setBadge(el, text){ el.textContent = text; }
+    function updateMeter(p){
+      const pct = Math.max(0, Math.min(1, p));
+      meter.style.width = (pct*100).toFixed(0) + '%';
+      confEl.textContent = (pct*100).toFixed(0) + '%';
+    }
+    function normalizeLabel(raw){
+      const s = String(raw || '').trim();
+      let best = s;
+      for(const k of CLASS_KEYS){
+        if(s.toLowerCase().includes(k.toLowerCase())) best = k;
+      }
+      return best;
+    }
+
+    // -----------------------------
     // Runtime state
     // -----------------------------
     let stream = null;
-    let classifier = null; // Teachable Machine model instance
+    let model = null;          // tmImage model instance
     let recognizing = false;
     let synthLock = false;
     let lastSpokenLabel = null;
     let lastSpokenAt = 0;
 
     // -----------------------------
-    // ML libraries (load on demand)
-    // NOTE: We use Teachable Machine official runtime (tmImage) instead of ml5,
-    // because ml5/tfjs version coupling can break on some iOS/WebKit builds.
+    // ML libs (pinned, loaded on demand)
+    // -----------------------------
     let libsReady = false;
-
     const TFJS_URLS = [
-      // Pinned for stability across Safari/WebKit
       'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js',
       'https://unpkg.com/@tensorflow/tfjs@3.21.0/dist/tf.min.js'
     ];
-
     const TMIMAGE_URLS = [
-      // Prefer local copy if you add it later
       './vendor/teachablemachine-image.min.js',
-      // Public mirrors (pinned)
       'https://unpkg.com/@teachablemachine/image@0.8.5/dist/teachablemachine-image.min.js',
       'https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8.5/dist/teachablemachine-image.min.js'
     ];
 
     function loadScriptOnce(src){
       return new Promise((resolve, reject) => {
-        const already = [...document.scripts].some(s => (s.src || '').includes(src.replace('./','')) || (s.src || '') === src);
+        const already = [...document.scripts].some(s => (s.src || '') === src || (s.src || '').endsWith(src.replace('./','')));
         if(already){ resolve(); return; }
         const s = document.createElement('script');
         s.src = src;
@@ -229,7 +255,7 @@
           log(`… provo ${label}: ${u}`);
           await loadScriptOnce(u);
           return u;
-        }catch(e){
+        }catch(_e){
           log(`… fallito ${label}: ${u}`);
         }
       }
@@ -253,26 +279,8 @@
       }catch(e){
         libsReady = false;
         log(`❌ Impossibile caricare le librerie ML. Dettaglio: ${e.message}`);
-        log('Suggerimento: su GitHub Pages puoi caricare tmImage localmente in /vendor/teachablemachine-image.min.js.');
         return false;
       }
-    }
-
-    // Helpers
-    // -----------------------------
-    function setBadge(el, text){ el.textContent = text; }
-    function updateMeter(p){
-      const pct = Math.max(0, Math.min(1, p));
-      meter.style.width = (pct*100).toFixed(0) + '%';
-      confEl.textContent = (pct*100).toFixed(0) + '%';
-    }
-    function normalizeLabel(raw){
-      const s = String(raw || '').trim();
-      let best = s;
-      for(const k of CLASS_KEYS){
-        if(s.toLowerCase().includes(k.toLowerCase())) best = k;
-      }
-      return best;
     }
 
     // -----------------------------
@@ -290,7 +298,6 @@
       }
 
       try{
-        // iOS-safe: simplest constraint
         stream = await navigator.mediaDevices.getUserMedia({ video:true, audio:false });
         video.srcObject = stream;
         await video.play();
@@ -310,7 +317,7 @@
     }
 
     function stopCamera(){
-      stopRecognition();
+      stopRecognition(true);
       if(stream){
         stream.getTracks().forEach(t => t.stop());
         stream = null;
@@ -319,14 +326,17 @@
       camState.textContent = 'non attiva';
       setBadge(runState, 'idle');
       log('🛑 Camera fermata.');
+
       stopCamBtn.disabled = true;
-      // keep loadBtn enabled only if you want to allow model load without camera; we keep it disabled.
       loadBtn.disabled = true;
       runBtn.disabled = true;
+      stopBtn.disabled = true;
+      updateMeter(0);
     }
 
     // -----------------------------
-    // Model loading
+    // Model loading (Teachable Machine)
+    // -----------------------------
     async function loadModel(){
       if(!stream){ log('⚠️ Avvia prima la camera.'); return; }
 
@@ -343,7 +353,6 @@
         return;
       }
 
-      // Build metadata url from model url
       const base = url.replace(/\/model\.json$/,'');
       const modelURL = base + '/model.json';
       const metadataURL = base + '/metadata.json';
@@ -352,7 +361,6 @@
       setBadge(runState, 'checking');
       log('🔎 Verifica model.json / metadata.json…');
 
-      // Fetch-check (clearer errors)
       try{
         const resM = await fetch(modelURL, { method:'GET', cache:'no-store' });
         if(!resM.ok){
@@ -366,7 +374,7 @@
           mlState.textContent = 'errore';
           setBadge(runState, 'error');
           log(`❌ metadata.json non raggiungibile (HTTP ${resMeta.status}).`);
-          log('Suggerimento: usa l’export TensorFlow.js di Teachable Machine (hosted).');
+          log('Suggerimento: usa l’export TensorFlow.js (hosted) di Teachable Machine.');
           return;
         }
       }catch(e){
@@ -381,11 +389,17 @@
       log('🤖 Caricamento modello (tmImage.load)…');
 
       try{
-        // Teachable Machine official loader
-        classifier = await window.tmImage.load(modelURL, metadataURL);
+        model = await window.tmImage.load(modelURL, metadataURL);
         mlState.textContent = 'pronto';
         setBadge(runState, 'ready');
         log('✅ Modello caricato.');
+
+        // Optional: list classes (useful for debugging)
+        try{
+          const classes = model.getClassLabels ? model.getClassLabels() : null;
+          if(classes && classes.length){ log('🏷️ Classi modello: ' + classes.join(', ')); }
+        }catch{}
+
         runBtn.disabled = false;
       }catch(err){
         mlState.textContent = 'errore';
@@ -397,31 +411,32 @@
       }
     }
 
+    // -----------------------------
     // Recognition loop
     // -----------------------------
     function startRecognition(){
-      if(!classifier){ log('⚠️ Carica prima il modello.'); return; }
+      if(!model){ log('⚠️ Carica prima il modello.'); return; }
       recognizing = true;
       runBtn.disabled = true;
       stopBtn.disabled = false;
       setBadge(runState, 'running');
       log('🧭 Riconoscimento avviato.');
-      loopClassify();
+      loopPredict();
     }
 
-    function stopRecognition(){
+    function stopRecognition(silent=false){
       recognizing = false;
       stopBtn.disabled = true;
-      runBtn.disabled = (classifier == null);
-      if(stream) setBadge(runState, classifier ? 'ready' : 'camera ok');
+      runBtn.disabled = (model == null);
+      if(stream) setBadge(runState, model ? 'ready' : 'camera ok');
+      if(!silent) log('🛑 Riconoscimento fermato.');
       updateMeter(0);
     }
 
-    function loopClassify(){
-      if(!recognizing || !classifier) return;
-      // tmImage returns an array of {className, probability}
-      classifier.predict(video).then((preds) => {
-        if(!preds || !preds.length){ requestAnimationFrame(loopClassify); return; }
+    function loopPredict(){
+      if(!recognizing || !model) return;
+      model.predict(video).then((preds) => {
+        if(!preds || !preds.length){ requestAnimationFrame(loopPredict); return; }
         let top = preds[0];
         for(const p of preds){ if(p.probability > top.probability) top = p; }
 
@@ -439,10 +454,10 @@
           lastSpokenAt = now;
         }
 
-        requestAnimationFrame(loopClassify);
+        requestAnimationFrame(loopPredict);
       }).catch((err) => {
         console.error(err);
-        requestAnimationFrame(loopClassify);
+        requestAnimationFrame(loopPredict);
       });
     }
 
@@ -478,7 +493,7 @@
     }
 
     // -----------------------------
-    // Self-check (light)
+    // Self-check + wiring
     // -----------------------------
     function selfCheck(){
       log(`🧪 Self-check: secureContext=${window.isSecureContext} | mediaDevices=${!!navigator.mediaDevices} | speech=${'speechSynthesis' in window}`);
@@ -487,14 +502,11 @@
       }
     }
 
-    // -----------------------------
-    // Wiring
-    // -----------------------------
     startBtn.addEventListener('click', startCamera);
     stopCamBtn.addEventListener('click', stopCamera);
     loadBtn.addEventListener('click', loadModel);
     runBtn.addEventListener('click', startRecognition);
-    stopBtn.addEventListener('click', () => { stopRecognition(); log('🛑 Riconoscimento fermato.'); });
+    stopBtn.addEventListener('click', () => stopRecognition(false));
     voiceBtn.addEventListener('click', testVoice);
 
     document.querySelectorAll('.quick').forEach(btn => {
@@ -502,13 +514,8 @@
     });
 
     // Boot
-    const RELEASE = '0.9.7';
-    const BUILD_TIME = new Date().toISOString();
-    const vb = document.getElementById('versionBadge');
-    if(vb){ vb.textContent = `🧾 v${RELEASE}`; vb.title = `Build ${BUILD_TIME}`; }
-
     selfCheck();
-    log('✅ Pagina pronta. 1) Avvia fotocamera  2) Incolla MODEL_URL  3) Carica modello  4) Riconoscimento continuo');
+    log(`✅ Pagina pronta — Release ${RELEASE}. 1) Avvia fotocamera  2) Incolla MODEL_URL  3) Carica modello  4) Riconoscimento continuo`);
   </script>
 </body>
 </html>
