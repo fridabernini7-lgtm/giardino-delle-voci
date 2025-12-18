@@ -61,7 +61,7 @@
         <p class="sub">Camera iOS‑safe + modello pre‑addestrato (Teachable Machine / TensorFlow.js) + voce sintetica. Nessuna app nativa. Il modello ML viene caricato <b>solo</b> quando premi “Carica modello”, così un eventuale blocco CDN non impedisce l’avvio camera.</p>
       </div>
       <div class="row">
-        <span class="badge" id="versionBadge">🧾 v0.9.4</span>
+        <span class="badge" id="versionBadge">🧾 v0.9.5</span>
         <span class="badge">🎥 Camera <b id="camState">non attiva</b></span>
         <span class="badge">🤖 Modello <b id="mlState">non caricato</b></span>
         <span class="badge">🧠 Stato <b id="runState">idle</b></span>
@@ -500,7 +500,7 @@
     });
 
     // Boot
-    const RELEASE = '0.9.4';
+    const RELEASE = '0.9.5';
     const BUILD_TIME = new Date().toISOString();
     const vb = document.getElementById('versionBadge');
     if(vb){ vb.textContent = `🧾 v${RELEASE}`; vb.title = `Build ${BUILD_TIME}`; }
