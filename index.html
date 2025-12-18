@@ -3,63 +3,65 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Giardino delle Voci — Zero‑App (Riconoscimento)</title>
+  <title>Giardino delle Voci — Zero‑App (PoC)</title>
   <style>
     :root{
       --bg:#faf8f5; --ink:#1f2937; --muted:#6b7280; --surface:#fff;
       --ok:#3a9159; --warn:#e2a21a; --accent:#4f8a8b; --accent2:#a7727d;
       --shadow:0 10px 30px rgba(0,0,0,.08); --r:16px;
     }
-    body{ margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; background:var(--bg); color:var(--ink);} 
-    .wrap{ max-width:1100px; margin:0 auto; padding:24px; }
-    header{ display:grid; grid-template-columns:1fr auto; gap:14px; align-items:end; margin-bottom:14px; }
-    h1{ margin:0; font-size:26px; }
-    .sub{ margin:6px 0 0; color:var(--muted); font-size:13px; }
-    .row{ display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end; }
-    .badge{ display:inline-flex; gap:8px; align-items:center; background:#eef6f6; color:#155; padding:6px 10px; border-radius:999px; font-size:12px; font-weight:700; }
-    .card{ background:var(--surface); border-radius:var(--r); box-shadow:var(--shadow); overflow:hidden; }
-    .grid{ display:grid; grid-template-columns:1fr; gap:16px; }
-    @media (min-width:980px){ .grid{ grid-template-columns: 1.2fr .8fr; } }
+    html,body{height:100%;}
+    body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);}
+    .wrap{max-width:1100px;margin:0 auto;padding:24px;}
+    header{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:end;margin-bottom:14px;}
+    h1{margin:0;font-size:26px;}
+    .sub{margin:6px 0 0;color:var(--muted);font-size:13px;line-height:1.35;}
+    .row{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;}
+    .badge{display:inline-flex;gap:8px;align-items:center;background:#eef6f6;color:#155;padding:6px 10px;border-radius:999px;font-size:12px;font-weight:700;}
+    .card{background:var(--surface);border-radius:var(--r);box-shadow:var(--shadow);overflow:hidden;}
+    .grid{display:grid;grid-template-columns:1fr;gap:16px;}
+    @media (min-width:980px){.grid{grid-template-columns:1.2fr .8fr;}}
 
-    .panel{ padding:16px; }
-    .videoShell{ position:relative; background:#000; border-radius:14px; overflow:hidden; aspect-ratio:16/10; }
-    video{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; background:#000; }
+    .panel{padding:16px;}
+    .videoShell{position:relative;background:#000;border-radius:14px;overflow:hidden;aspect-ratio:16/10;}
+    video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000;}
 
-    .toolbar{ display:flex; flex-wrap:wrap; gap:10px; margin-top:12px; }
-    button{ appearance:none; border:0; border-radius:12px; padding:10px 14px; font-weight:700; cursor:pointer; background:var(--ink); color:#fff; box-shadow:var(--shadow); }
-    button.secondary{ background:var(--accent); }
-    button.ok{ background:var(--ok); }
-    button.warn{ background:var(--warn); color:#232323; }
-    button.ghost{ background:#eef1f3; color:#24313f; }
-    button:disabled{ opacity:.55; cursor:not-allowed; }
+    .toolbar{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px;}
+    button{appearance:none;border:0;border-radius:12px;padding:10px 14px;font-weight:800;cursor:pointer;background:var(--ink);color:#fff;box-shadow:var(--shadow);}
+    button.secondary{background:var(--accent);} 
+    button.ok{background:var(--ok);} 
+    button.warn{background:var(--warn);color:#232323;} 
+    button.ghost{background:#eef1f3;color:#24313f;} 
+    button:disabled{opacity:.55;cursor:not-allowed;}
 
-    .bins{ display:grid; grid-template-columns:repeat(2,1fr); gap:12px; margin-top:12px; }
-    @media (min-width:720px){ .bins{ grid-template-columns:repeat(4,1fr);} }
-    .bin{ background:#f4f6f8; border-radius:14px; padding:12px; display:grid; gap:8px; }
-    .bin h4{ margin:0; font-size:14px; }
-    .bin small{ color:var(--muted); }
+    .bins{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:12px;}
+    @media (min-width:720px){.bins{grid-template-columns:repeat(4,1fr);}}
+    .bin{background:#f4f6f8;border-radius:14px;padding:12px;display:grid;gap:8px;}
+    .bin h4{margin:0;font-size:14px;}
+    .bin small{color:var(--muted);} 
 
-    .kpi{ display:grid; grid-template-columns:auto 1fr auto; gap: 8px 12px; align-items:center; margin-top:12px; }
-    .meter{ height:8px; background:#e9edf0; border-radius:999px; overflow:hidden; }
-    .meter i{ display:block; height:100%; width:0%; background:linear-gradient(90deg,var(--accent),var(--accent2)); transition:width .2s ease; }
-    .pill{ display:inline-block; padding:4px 8px; border-radius:999px; background:#ecf0f3; font-size:12px; }
+    .kpi{display:grid;grid-template-columns:auto 1fr auto;gap:8px 12px;align-items:center;margin-top:12px;}
+    .meter{height:8px;background:#e9edf0;border-radius:999px;overflow:hidden;}
+    .meter i{display:block;height:100%;width:0%;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .2s ease;}
+    .pill{display:inline-block;padding:4px 8px;border-radius:999px;background:#ecf0f3;font-size:12px;}
 
-    .log{ background:#0f141a; color:#d9e2ea; border-radius:12px; padding:12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size:12px; height:190px; overflow:auto; }
-    .hint{ color:var(--muted); font-size:12px; margin:0 0 10px; }
-    label{ font-size:12px; color:var(--muted); font-weight:700; display:block; margin-bottom:6px; }
-    input{ width:100%; padding:10px 12px; border-radius:12px; border:1px solid #e5e7eb; font-size:12px; }
-
-    footer{ margin-top:16px; color:var(--muted); font-size:12px; }
+    .hint{color:var(--muted);font-size:12px;margin:0 0 10px;line-height:1.35;}
+    label{font-size:12px;color:var(--muted);font-weight:800;display:block;margin-bottom:6px;}
+    input{width:100%;padding:10px 12px;border-radius:12px;border:1px solid #e5e7eb;font-size:12px;}
+    .log{background:#0f141a;color:#d9e2ea;border-radius:12px;padding:12px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;height:210px;overflow:auto;}
+    footer{margin-top:16px;color:var(--muted);font-size:12px;}
+    code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;}
   </style>
 </head>
 <body>
   <div class="wrap">
     <header>
       <div>
-        <h1>Giardino delle Voci — Zero‑App (Riconoscimento)</h1>
-        <p class="sub">Versione completa: camera iOS‑safe + modello pre‑addestrato (Teachable Machine / ml5) + voce sintetica. Nessuna app nativa.</p>
+        <h1>Giardino delle Voci — Zero‑App (PoC)</h1>
+        <p class="sub">Camera iOS‑safe + modello pre‑addestrato (Teachable Machine / TensorFlow.js) + voce sintetica. Nessuna app nativa. Il modello ML viene caricato <b>solo</b> quando premi “Carica modello”, così un eventuale blocco CDN non impedisce l’avvio camera.</p>
       </div>
       <div class="row">
+        <span class="badge" id="versionBadge">🧾 v0.9.4</span>
         <span class="badge">🎥 Camera <b id="camState">non attiva</b></span>
         <span class="badge">🤖 Modello <b id="mlState">non caricato</b></span>
         <span class="badge">🧠 Stato <b id="runState">idle</b></span>
@@ -67,7 +69,6 @@
     </header>
 
     <section class="grid">
-      <!-- Left: camera + controls -->
       <div class="card panel">
         <div class="videoShell">
           <video id="video" playsinline muted></video>
@@ -75,6 +76,7 @@
 
         <div class="toolbar">
           <button id="startBtn" class="ok">Avvia fotocamera</button>
+          <button id="stopCamBtn" class="warn" disabled>Ferma camera</button>
           <button id="loadBtn" class="ghost" disabled>Carica modello</button>
           <button id="runBtn" disabled>Riconoscimento continuo</button>
           <button id="stopBtn" class="warn" disabled>Ferma</button>
@@ -82,22 +84,10 @@
         </div>
 
         <div class="bins">
-          <div class="bin">
-            <h4>🌿 Lina (Foglia)</h4>
-            <small>Label modello: <b>Lina</b></small>
-          </div>
-          <div class="bin">
-            <h4>💧 Nuna (Goccia)</h4>
-            <small>Label modello: <b>Nuna</b></small>
-          </div>
-          <div class="bin">
-            <h4>🪨 Timo (Sasso)</h4>
-            <small>Label modello: <b>Timo</b></small>
-          </div>
-          <div class="bin">
-            <h4>🌱 Sofi (Radice)</h4>
-            <small>Label modello: <b>Sofi</b></small>
-          </div>
+          <div class="bin"><h4>🌿 Lina (Foglia)</h4><small>Label modello: <b>Lina</b></small></div>
+          <div class="bin"><h4>💧 Nuna (Goccia)</h4><small>Label modello: <b>Nuna</b></small></div>
+          <div class="bin"><h4>🪨 Timo (Sasso)</h4><small>Label modello: <b>Timo</b></small></div>
+          <div class="bin"><h4>🌱 Sofi (Radice)</h4><small>Label modello: <b>Sofi</b></small></div>
         </div>
 
         <div class="kpi">
@@ -107,9 +97,8 @@
         </div>
       </div>
 
-      <!-- Right: logs + settings -->
       <div class="card panel">
-        <p class="hint"><strong>Importante:</strong> per il riconoscimento serve un modello pre‑addestrato con 4 classi etichettate <b>Lina</b>, <b>Nuna</b>, <b>Timo</b>, <b>Sofi</b>. Incolla l’URL del <code>model.json</code> (Teachable Machine) qui sotto.</p>
+        <p class="hint"><b>Passi:</b> (1) Avvia fotocamera • (2) incolla <code>…/model.json</code> • (3) Carica modello • (4) Riconoscimento continuo. Le classi nel modello devono chiamarsi <b>Lina</b>, <b>Nuna</b>, <b>Timo</b>, <b>Sofi</b>.</p>
 
         <label for="modelUrl">MODEL_URL (model.json)</label>
         <input id="modelUrl" placeholder="https://teachablemachine.withgoogle.com/models/XXXX/model.json" />
@@ -120,7 +109,7 @@
         </div>
 
         <div style="margin-top:12px;">
-          <strong style="font-size:13px;">Fallback (senza riconoscimento)</strong>
+          <strong style="font-size:13px;">Fallback</strong>
           <div class="toolbar">
             <button class="ghost quick" data-label="Lina">Parla: Lina</button>
             <button class="ghost quick" data-label="Nuna">Parla: Nuna</button>
@@ -132,24 +121,30 @@
     </section>
 
     <footer>
-      PoC: riconoscimento in‑browser (ml5) + TTS locale. Per produzione: voci premium, contenuti UE, e PWA con caching offline.
+      PoC: riconoscimento in-browser + TTS locale. Per produzione: contenuti UE, voci premium, e PWA con caching offline.
     </footer>
   </div>
 
-  <!-- TFJS + ml5 are loaded on-demand (after camera works) to avoid breaking camera on iOS if a CDN is blocked. -->
   <script>
     // -----------------------------
-    // Giardino delle Voci — runtime
-    // Robust error logging (so a JS error never looks like a “camera problem”)
+    // Robust logging (avoid “silent” failures)
+    // -----------------------------
+    const logEl = document.getElementById('log');
+    function log(msg){
+      const t = new Date().toLocaleTimeString();
+      logEl.innerHTML = `[${t}] ${msg}<br>` + logEl.innerHTML;
+    }
     window.addEventListener('error', (e) => {
-      try{ log(`💥 JS error: ${e.message || e.error || 'unknown'}`); }catch{}
+      try{ log(`💥 JS error: ${e.message || 'unknown'}`); }catch{}
     });
     window.addEventListener('unhandledrejection', (e) => {
       try{ log(`💥 Promise rejection: ${e.reason?.message || e.reason || 'unknown'}`); }catch{}
     });
+
+    // -----------------------------
+    // UI refs
     // -----------------------------
     const video = document.getElementById('video');
-    const logEl = document.getElementById('log');
     const meter = document.getElementById('meter');
     const confEl = document.getElementById('conf');
     const camState = document.getElementById('camState');
@@ -157,12 +152,16 @@
     const runState = document.getElementById('runState');
 
     const startBtn = document.getElementById('startBtn');
+    const stopCamBtn = document.getElementById('stopCamBtn');
     const loadBtn = document.getElementById('loadBtn');
     const runBtn = document.getElementById('runBtn');
     const stopBtn = document.getElementById('stopBtn');
     const voiceBtn = document.getElementById('voiceBtn');
     const modelUrlInput = document.getElementById('modelUrl');
 
+    // -----------------------------
+    // Characters
+    // -----------------------------
     const CLASSES = {
       Lina: { icon:'🌿', name:'Lina', script:[
         'Ciao, sono Lina la Foglia. Oggi ho danzato con il vento.',
@@ -179,17 +178,26 @@
     };
     const CLASS_KEYS = Object.keys(CLASSES);
 
+    // -----------------------------
     // Runtime state
+    // -----------------------------
     let stream = null;
     let classifier = null;
-    let libsReady = false;
+    let recognizing = false;
+    let synthLock = false;
+    let lastSpokenLabel = null;
+    let lastSpokenAt = 0;
 
+    // -----------------------------
+    // ML libraries (load on demand)
+    // -----------------------------
+    let libsReady = false;
     const TFJS_URL = 'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js';
     const ML5_URL  = 'https://cdnjs.cloudflare.com/ajax/libs/ml5/0.12.2/ml5.min.js';
 
     function loadScriptOnce(src){
       return new Promise((resolve, reject) => {
-        const already = [...document.scripts].some(s => s.src && s.src === src);
+        const already = [...document.scripts].some(s => s.src === src);
         if(already){ resolve(); return; }
         const s = document.createElement('script');
         s.src = src;
@@ -204,6 +212,7 @@
 
     async function ensureMlLibs(){
       if(libsReady) return true;
+      setBadge(runState, 'loading libs');
       log('📦 Caricamento librerie ML (tfjs + ml5)…');
       try{
         await loadScriptOnce(TFJS_URL);
@@ -215,30 +224,31 @@
         return true;
       }catch(e){
         libsReady = false;
-        log(`❌ Impossibile caricare le librerie ML (CDN bloccato?). Dettaglio: ${e.message}`);
+        log(`❌ Impossibile caricare le librerie ML. Dettaglio: ${e.message}`);
         return false;
       }
     }
-    let recognizing = false;
-    let synthLock = false;
-    let lastSpokenLabel = null;
-    let lastSpokenAt = 0;
 
-    function log(msg){
-      const t = new Date().toLocaleTimeString();
-      logEl.innerHTML = `[${t}] ${msg}<br>` + logEl.innerHTML;
-    }
-
+    // -----------------------------
+    // Helpers
+    // -----------------------------
     function setBadge(el, text){ el.textContent = text; }
-
     function updateMeter(p){
       const pct = Math.max(0, Math.min(1, p));
       meter.style.width = (pct*100).toFixed(0) + '%';
       confEl.textContent = (pct*100).toFixed(0) + '%';
     }
+    function normalizeLabel(raw){
+      const s = String(raw || '').trim();
+      let best = s;
+      for(const k of CLASS_KEYS){
+        if(s.toLowerCase().includes(k.toLowerCase())) best = k;
+      }
+      return best;
+    }
 
     // -----------------------------
-    // Camera (iOS safe): video:true
+    // Camera (iOS-safe)
     // -----------------------------
     async function startCamera(){
       setBadge(runState, 'starting');
@@ -247,11 +257,12 @@
       if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
         camState.textContent = 'non supportata';
         setBadge(runState, 'blocked');
-        log('❌ getUserMedia non supportato in questo contesto/browser.');
+        log('❌ getUserMedia non supportato in questo browser/contesto.');
         return;
       }
 
       try{
+        // iOS-safe: simplest constraint
         stream = await navigator.mediaDevices.getUserMedia({ video:true, audio:false });
         video.srcObject = stream;
         await video.play();
@@ -260,50 +271,44 @@
         setBadge(runState, 'camera ok');
         log('✅ Camera attiva.');
 
+        stopCamBtn.disabled = false;
         loadBtn.disabled = false;
       }catch(err){
         camState.textContent = 'errore';
         setBadge(runState, 'blocked');
-        log(`❌ Errore camera: ${err.name}`);
+        log(`❌ Errore camera: ${err.name}${err.message ? ' — ' + err.message : ''}`);
         console.error(err);
       }
     }
 
     function stopCamera(){
+      stopRecognition();
       if(stream){
         stream.getTracks().forEach(t => t.stop());
         stream = null;
       }
       video.srcObject = null;
       camState.textContent = 'non attiva';
+      setBadge(runState, 'idle');
       log('🛑 Camera fermata.');
+      stopCamBtn.disabled = true;
+      // keep loadBtn enabled only if you want to allow model load without camera; we keep it disabled.
+      loadBtn.disabled = true;
+      runBtn.disabled = true;
     }
 
     // -----------------------------
-    // Model loading (pre‑trained)
+    // Model loading
     // -----------------------------
     async function loadModel(){
-      let url = (modelUrlInput.value || '').trim();
-      if(!url){
-        log('⚠️ Inserisci l’URL del modello (Teachable Machine).');
-        return;
-      }
-      if(!stream){
-        log('⚠️ Avvia prima la camera.');
-        return;
-      }
-      // Accetta anche URL base del modello (…/models/XXXX/) e normalizza a …/model.json
-      if(url.endsWith('/')) url = url.slice(0,-1);
-      if(!url.endsWith('model.json')){
-        // se è un link base del modello TM, aggiungi /model.json
-        url = url + '/model.json';
-      }
-      if(!url.startsWith('https://')){
-        log('⚠️ Il MODEL_URL deve iniziare con https:// (iOS richiede contesto sicuro).');
-        return;
-      }
+      if(!stream){ log('⚠️ Avvia prima la camera.'); return; }
 
-      // Ensure ML libraries are available (camera must keep working even if this fails)
+      let url = (modelUrlInput.value || '').trim();
+      if(!url){ log('⚠️ Inserisci il MODEL_URL.'); return; }
+      if(url.endsWith('/')) url = url.slice(0,-1);
+      if(!url.endsWith('model.json')) url = url + '/model.json';
+      if(!url.startsWith('https://')){ log('⚠️ Il MODEL_URL deve iniziare con https://'); return; }
+
       const okLibs = await ensureMlLibs();
       if(!okLibs){
         mlState.textContent = 'errore';
@@ -313,62 +318,50 @@
 
       mlState.textContent = 'verifica…';
       setBadge(runState, 'checking');
-      log('🔎 Verifica accessibilità model.json…');
+      log('🔎 Verifica model.json…');
 
-      // Verifica che il file sia raggiungibile e abbia struttura plausibile TFJS
+      // Fetch-check before initializing ml5 (better error messages)
       try{
-        const res = await fetch(url, { method: 'GET', cache: 'no-store' });
+        const res = await fetch(url, { method:'GET', cache:'no-store' });
         if(!res.ok){
           mlState.textContent = 'errore';
           setBadge(runState, 'error');
-          log(`❌ model.json non raggiungibile (HTTP ${res.status}). Apri l’URL in un tab: deve mostrarti JSON.`);
+          log(`❌ model.json non raggiungibile (HTTP ${res.status}).`);
+          log('Suggerimento: apri l’URL in un tab: deve mostrarti JSON.');
           return;
         }
-        const txt = await res.text();
-        let js;
-        try{ js = JSON.parse(txt); }catch(e){
+        const js = await res.json();
+        if(!(js.modelTopology || js.weightsManifest)){
           mlState.textContent = 'errore';
           setBadge(runState, 'error');
-          log('❌ Il file non è JSON valido. Assicurati di usare Export → TensorFlow.js e l’URL che termina con /model.json.');
+          log('❌ Questo JSON non sembra un modello TensorFlow.js (mancano modelTopology/weightsManifest).');
+          log('Ri‑esporta da Teachable Machine: Export → TensorFlow.js (Image Project).');
           return;
         }
-        const looksTfjs = !!(js.modelTopology || js.weightsManifest);
-        if(!looksTfjs){
-          mlState.textContent = 'errore';
-          setBadge(runState, 'error');
-          log('❌ Questo JSON non sembra un modello TensorFlow.js (mancano modelTopology/weightsManifest). Ri-esporta da Teachable Machine come TensorFlow.js (Image Project).');
-          return;
-        }
-      } catch (e){
+      }catch(e){
         mlState.textContent = 'errore';
         setBadge(runState, 'error');
-        log(`❌ Impossibile scaricare model.json (rete/CORS). Dettaglio: ${e.message || e}`);
+        log(`❌ Impossibile scaricare/parsare model.json (rete/CORS). Dettaglio: ${e.message}`);
         return;
       }
 
       mlState.textContent = 'caricamento…';
       setBadge(runState, 'loading');
-      log('🤖 Caricamento modello (ml5.imageClassifier)…');
+      log('🤖 Inizializzazione modello (ml5.imageClassifier)…');
 
       try{
-        if(typeof window.ml5 === 'undefined'){
-          mlState.textContent = 'errore';
-          setBadge(runState, 'error');
-          log('❌ ml5 non è disponibile. Verifica che gli script tfjs/ml5 si carichino (nessun blocker/Content-Security).');
-          return;
-        }
-        classifier = ml5.imageClassifier(url, video, () => {
+        // Use ml5 on the existing video element
+        classifier = window.ml5.imageClassifier(url, video, () => {
           mlState.textContent = 'pronto';
           setBadge(runState, 'ready');
           log('✅ Modello caricato.');
           runBtn.disabled = false;
         });
-      } catch (err){
+      }catch(err){
         mlState.textContent = 'errore';
         setBadge(runState, 'error');
-        log(`❌ Errore durante l’inizializzazione del modello: ${err?.name || 'Error'} — ${err?.message || String(err)}`);
-        if(err?.stack){ log('↳ Stack (prima riga): ' + String(err.stack).split('
-')[0]); }
+        log(`❌ Errore inizializzazione: ${err?.name || 'Error'} — ${err?.message || String(err)}`);
+        if(err?.stack) log('↳ ' + String(err.stack).split('\n')[0]);
         console.error(err);
       }
     }
@@ -376,16 +369,6 @@
     // -----------------------------
     // Recognition loop
     // -----------------------------
-    function normalizeLabel(raw){
-      const s = String(raw || '').trim();
-      // Teachable Machine sometimes returns "Class 1: Lina" or similar
-      let best = s;
-      for(const k of CLASS_KEYS){
-        if(s.toLowerCase().includes(k.toLowerCase())) best = k;
-      }
-      return best;
-    }
-
     function startRecognition(){
       if(!classifier){ log('⚠️ Carica prima il modello.'); return; }
       recognizing = true;
@@ -398,10 +381,9 @@
 
     function stopRecognition(){
       recognizing = false;
-      runBtn.disabled = (classifier == null);
       stopBtn.disabled = true;
-      setBadge(runState, 'ready');
-      log('🛑 Riconoscimento fermato.');
+      runBtn.disabled = (classifier == null);
+      if(stream) setBadge(runState, classifier ? 'ready' : 'camera ok');
       updateMeter(0);
     }
 
@@ -413,18 +395,15 @@
           requestAnimationFrame(loopClassify);
           return;
         }
-        if(!results || !results[0]){
-          requestAnimationFrame(loopClassify);
-          return;
-        }
-        const top = results[0];
+        const top = (results && results[0]) ? results[0] : null;
+        if(!top){ requestAnimationFrame(loopClassify); return; }
+
         const conf = (top.confidence != null) ? top.confidence : (top.probability || 0);
         const label = normalizeLabel(top.label);
         updateMeter(conf);
 
-        // speak policy: >0.85, avoid repeats, avoid bursts
         const now = Date.now();
-        const minGapMs = 3000;
+        const minGapMs = 2800;
         const isNew = (label !== lastSpokenLabel) || (now - lastSpokenAt > 12000);
 
         if(conf >= 0.85 && CLASSES[label] && isNew && (now - lastSpokenAt > minGapMs)){
@@ -440,17 +419,6 @@
     // -----------------------------
     // Speech
     // -----------------------------
-    function speakOnce(label, conf){
-      if(synthLock) return;
-      const c = CLASSES[label];
-      if(!c) return;
-      const line = c.script[Math.floor(Math.random()*c.script.length)];
-      log(`${c.icon} <${c.name}> (${(conf*100).toFixed(0)}%): ${line}`);
-      speak(`${c.name} dice: ${line}`);
-      synthLock = true;
-      setTimeout(() => { synthLock = false; }, 2500);
-    }
-
     function speak(text){
       if(!('speechSynthesis' in window)){
         log('🔈 Sintesi vocale non supportata.');
@@ -464,25 +432,39 @@
       window.speechSynthesis.speak(u);
     }
 
+    function speakOnce(label, conf){
+      if(synthLock) return;
+      const c = CLASSES[label];
+      const line = c.script[Math.floor(Math.random()*c.script.length)];
+      log(`${c.icon} <${c.name}> (${(conf*100).toFixed(0)}%): ${line}`);
+      speak(`${c.name} dice: ${line}`);
+      synthLock = true;
+      setTimeout(() => { synthLock = false; }, 2400);
+    }
+
     function testVoice(){
       speak('Ciao. Questa è una prova voce del Giardino delle Voci.');
       log('🔊 Test voce eseguito.');
     }
 
     // -----------------------------
-    // Tiny “tests” (runtime checks)
+    // Self-check (light)
     // -----------------------------
     function selfCheck(){
-      const secure = window.isSecureContext;
-      log(`🧪 Self-check: secureContext=${secure} | mediaDevices=${!!navigator.mediaDevices} | speech=${'speechSynthesis' in window}`);
-      if(!secure){ log('⚠️ Attenzione: il contesto non è sicuro. Su iOS la camera richiede HTTPS.'); }
+      log(`🧪 Self-check: secureContext=${window.isSecureContext} | mediaDevices=${!!navigator.mediaDevices} | speech=${'speechSynthesis' in window}`);
+      if(!window.isSecureContext){
+        log('⚠️ Contesto non sicuro: su iOS la camera richiede HTTPS.');
+      }
     }
 
+    // -----------------------------
     // Wiring
+    // -----------------------------
     startBtn.addEventListener('click', startCamera);
+    stopCamBtn.addEventListener('click', stopCamera);
     loadBtn.addEventListener('click', loadModel);
     runBtn.addEventListener('click', startRecognition);
-    stopBtn.addEventListener('click', stopRecognition);
+    stopBtn.addEventListener('click', () => { stopRecognition(); log('🛑 Riconoscimento fermato.'); });
     voiceBtn.addEventListener('click', testVoice);
 
     document.querySelectorAll('.quick').forEach(btn => {
@@ -490,6 +472,11 @@
     });
 
     // Boot
+    const RELEASE = '0.9.4';
+    const BUILD_TIME = new Date().toISOString();
+    const vb = document.getElementById('versionBadge');
+    if(vb){ vb.textContent = `🧾 v${RELEASE}`; vb.title = `Build ${BUILD_TIME}`; }
+
     selfCheck();
     log('✅ Pagina pronta. 1) Avvia fotocamera  2) Incolla MODEL_URL  3) Carica modello  4) Riconoscimento continuo');
   </script>
