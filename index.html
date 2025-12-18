@@ -135,17 +135,10 @@
     // -----------------------------
     // Robust logging (avoid “silent” failures)
     // -----------------------------
-    const logEl = document.getElementById('log');
-    function log(msg){
-      const t = new Date().toLocaleTimeString();
-      logEl.innerHTML = `[${t}] ${msg}<br>` + logEl.innerHTML;
-    }
-    window.addEventListener('error', (e) => {
-      try{ log(`💥 JS error: ${e.message || 'unknown'}`); }catch{}
-    });
-    window.addEventListener('unhandledrejection', (e) => {
-      try{ log(`💥 Promise rejection: ${e.reason?.message || e.reason || 'unknown'}`); }catch{}
-    });
+    // If anything breaks before the log panel is available, we still log to console.
+    let logEl = null;
+    const debugOverlay = document.createElement('div');
+    debugOverlay.style.cssText = 'position:fixed;left:10px;bottom:10px;z-index:9999;background:rgba(0,0,0,.75);color:#fff;padding:6px 8px;
 
     // -----------------------------
     // Release badge
