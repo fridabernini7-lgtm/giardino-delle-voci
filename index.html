@@ -61,7 +61,7 @@
         <p class="sub">Camera iOS‑safe + modello pre‑addestrato (Teachable Machine / TensorFlow.js) + voce sintetica. Nessuna app nativa. Il modello ML viene caricato <b>solo</b> quando premi “Carica modello”, così un eventuale blocco CDN non impedisce l’avvio camera.</p>
       </div>
       <div class="row">
-        <span class="badge" id="versionBadge">🧾 v0.9.6</span>
+        <span class="badge" id="versionBadge">🧾 v0.9.7</span>
         <span class="badge">🎥 Camera <b id="camState">non attiva</b></span>
         <span class="badge">🤖 Modello <b id="mlState">non caricato</b></span>
         <span class="badge">🧠 Stato <b id="runState">idle</b></span>
@@ -182,7 +182,7 @@
     // Runtime state
     // -----------------------------
     let stream = null;
-    let classifier = null;
+    let classifier = null; // Teachable Machine model instance
     let recognizing = false;
     let synthLock = false;
     let lastSpokenLabel = null;
@@ -190,25 +190,26 @@
 
     // -----------------------------
     // ML libraries (load on demand)
-    // -----------------------------
+    // NOTE: We use Teachable Machine official runtime (tmImage) instead of ml5,
+    // because ml5/tfjs version coupling can break on some iOS/WebKit builds.
     let libsReady = false;
+
     const TFJS_URLS = [
-      // Pinned for ml5 0.12.x compatibility
+      // Pinned for stability across Safari/WebKit
       'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js',
       'https://unpkg.com/@tensorflow/tfjs@3.21.0/dist/tf.min.js'
     ];
-    // ml5 is sometimes blocked on cdnjs; provide multiple mirrors (and allow a local copy).
-    const ML5_URLS = [
-      // Prefer local copy for reliability
-      './vendor/ml5.min.js',
+
+    const TMIMAGE_URLS = [
+      // Prefer local copy if you add it later
+      './vendor/teachablemachine-image.min.js',
       // Public mirrors (pinned)
-      'https://unpkg.com/ml5@0.12.2/dist/ml5.min.js',
-      'https://cdn.jsdelivr.net/npm/ml5@0.12.2/dist/ml5.min.js'
+      'https://unpkg.com/@teachablemachine/image@0.8.5/dist/teachablemachine-image.min.js',
+      'https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8.5/dist/teachablemachine-image.min.js'
     ];
 
     function loadScriptOnce(src){
       return new Promise((resolve, reject) => {
-        // Treat already-loaded scripts as present even if the browser rewrites the URL.
         const already = [...document.scripts].some(s => (s.src || '').includes(src.replace('./','')) || (s.src || '') === src);
         if(already){ resolve(); return; }
         const s = document.createElement('script');
@@ -238,28 +239,25 @@
     async function ensureMlLibs(){
       if(libsReady) return true;
       setBadge(runState, 'loading libs');
-      log('📦 Caricamento librerie ML (tfjs + ml5)…');
+      log('📦 Caricamento librerie ML (tfjs + tmImage)…');
       try{
-        // tfjs
         await tryLoadAny(TFJS_URLS, 'tfjs');
         log(`… tfjs ${(typeof window.tf !== 'undefined') ? 'OK' : 'MISSING'}`);
 
-        // ml5
-        await tryLoadAny(ML5_URLS, 'ml5');
-        log(`… ml5 ${(typeof window.ml5 !== 'undefined') ? 'OK' : 'MISSING'}`);
+        await tryLoadAny(TMIMAGE_URLS, 'tmImage');
+        log(`… tmImage ${(typeof window.tmImage !== 'undefined') ? 'OK' : 'MISSING'}`);
 
-        libsReady = (typeof window.tf !== 'undefined') && (typeof window.ml5 !== 'undefined');
-        if(!libsReady) throw new Error('tfjs/ml5 missing after load');
+        libsReady = (typeof window.tf !== 'undefined') && (typeof window.tmImage !== 'undefined');
+        if(!libsReady) throw new Error('tfjs/tmImage missing after load');
         return true;
       }catch(e){
         libsReady = false;
         log(`❌ Impossibile caricare le librerie ML. Dettaglio: ${e.message}`);
-        log('Suggerimento: se sei su GitHub Pages, puoi caricare ml5 localmente in /vendor/ml5.min.js (vedi istruzioni).');
+        log('Suggerimento: su GitHub Pages puoi caricare tmImage localmente in /vendor/teachablemachine-image.min.js.');
         return false;
       }
     }
 
-    // -----------------------------
     // Helpers
     // -----------------------------
     function setBadge(el, text){ el.textContent = text; }
@@ -329,7 +327,6 @@
 
     // -----------------------------
     // Model loading
-    // -----------------------------
     async function loadModel(){
       if(!stream){ log('⚠️ Avvia prima la camera.'); return; }
 
@@ -346,57 +343,60 @@
         return;
       }
 
+      // Build metadata url from model url
+      const base = url.replace(/\/model\.json$/,'');
+      const modelURL = base + '/model.json';
+      const metadataURL = base + '/metadata.json';
+
       mlState.textContent = 'verifica…';
       setBadge(runState, 'checking');
-      log('🔎 Verifica model.json…');
+      log('🔎 Verifica model.json / metadata.json…');
 
-      // Fetch-check before initializing ml5 (better error messages)
+      // Fetch-check (clearer errors)
       try{
-        const res = await fetch(url, { method:'GET', cache:'no-store' });
-        if(!res.ok){
+        const resM = await fetch(modelURL, { method:'GET', cache:'no-store' });
+        if(!resM.ok){
           mlState.textContent = 'errore';
           setBadge(runState, 'error');
-          log(`❌ model.json non raggiungibile (HTTP ${res.status}).`);
-          log('Suggerimento: apri l’URL in un tab: deve mostrarti JSON.');
+          log(`❌ model.json non raggiungibile (HTTP ${resM.status}).`);
           return;
         }
-        const js = await res.json();
-        if(!(js.modelTopology || js.weightsManifest)){
+        const resMeta = await fetch(metadataURL, { method:'GET', cache:'no-store' });
+        if(!resMeta.ok){
           mlState.textContent = 'errore';
           setBadge(runState, 'error');
-          log('❌ Questo JSON non sembra un modello TensorFlow.js (mancano modelTopology/weightsManifest).');
-          log('Ri‑esporta da Teachable Machine: Export → TensorFlow.js (Image Project).');
+          log(`❌ metadata.json non raggiungibile (HTTP ${resMeta.status}).`);
+          log('Suggerimento: usa l’export TensorFlow.js di Teachable Machine (hosted).');
           return;
         }
       }catch(e){
         mlState.textContent = 'errore';
         setBadge(runState, 'error');
-        log(`❌ Impossibile scaricare/parsare model.json (rete/CORS). Dettaglio: ${e.message}`);
+        log(`❌ Errore rete/CORS nel controllo modello: ${e.message}`);
         return;
       }
 
       mlState.textContent = 'caricamento…';
       setBadge(runState, 'loading');
-      log('🤖 Inizializzazione modello (ml5.imageClassifier)…');
+      log('🤖 Caricamento modello (tmImage.load)…');
 
       try{
-        // Use ml5 on the existing video element
-        classifier = window.ml5.imageClassifier(url, video, () => {
-          mlState.textContent = 'pronto';
-          setBadge(runState, 'ready');
-          log('✅ Modello caricato.');
-          runBtn.disabled = false;
-        });
+        // Teachable Machine official loader
+        classifier = await window.tmImage.load(modelURL, metadataURL);
+        mlState.textContent = 'pronto';
+        setBadge(runState, 'ready');
+        log('✅ Modello caricato.');
+        runBtn.disabled = false;
       }catch(err){
         mlState.textContent = 'errore';
         setBadge(runState, 'error');
-        log(`❌ Errore inizializzazione: ${err?.name || 'Error'} — ${err?.message || String(err)}`);
-        if(err?.stack) log('↳ ' + String(err.stack).split('\n')[0]);
+        log(`❌ Errore caricamento modello: ${err?.message || String(err)}`);
+        if(err?.stack) log('↳ ' + String(err.stack).split('
+')[0]);
         console.error(err);
       }
     }
 
-    // -----------------------------
     // Recognition loop
     // -----------------------------
     function startRecognition(){
@@ -419,17 +419,14 @@
 
     function loopClassify(){
       if(!recognizing || !classifier) return;
-      classifier.classify((err, results) => {
-        if(err){
-          console.error(err);
-          requestAnimationFrame(loopClassify);
-          return;
-        }
-        const top = (results && results[0]) ? results[0] : null;
-        if(!top){ requestAnimationFrame(loopClassify); return; }
+      // tmImage returns an array of {className, probability}
+      classifier.predict(video).then((preds) => {
+        if(!preds || !preds.length){ requestAnimationFrame(loopClassify); return; }
+        let top = preds[0];
+        for(const p of preds){ if(p.probability > top.probability) top = p; }
 
-        const conf = (top.confidence != null) ? top.confidence : (top.probability || 0);
-        const label = normalizeLabel(top.label);
+        const conf = top.probability || 0;
+        const label = normalizeLabel(top.className);
         updateMeter(conf);
 
         const now = Date.now();
@@ -442,6 +439,9 @@
           lastSpokenAt = now;
         }
 
+        requestAnimationFrame(loopClassify);
+      }).catch((err) => {
+        console.error(err);
         requestAnimationFrame(loopClassify);
       });
     }
@@ -502,7 +502,7 @@
     });
 
     // Boot
-    const RELEASE = '0.9.6';
+    const RELEASE = '0.9.7';
     const BUILD_TIME = new Date().toISOString();
     const vb = document.getElementById('versionBadge');
     if(vb){ vb.textContent = `🧾 v${RELEASE}`; vb.title = `Build ${BUILD_TIME}`; }
