@@ -61,7 +61,7 @@
         <p class="sub">Camera iOS‑safe + modello pre‑addestrato (Teachable Machine / TensorFlow.js) + voce sintetica. Nessuna app nativa. Il modello ML viene caricato <b>solo</b> quando premi “Carica modello”, così un eventuale blocco CDN non impedisce l’avvio camera.</p>
       </div>
       <div class="row">
-        <span class="badge" id="versionBadge">🧾 v0.9.7</span>
+        <span class="badge" id="versionBadge">🧾 v0.9.8</span>
         <span class="badge">🎥 Camera <b id="camState">non attiva</b></span>
         <span class="badge">🤖 Modello <b id="mlState">non caricato</b></span>
         <span class="badge">🧠 Stato <b id="runState">idle</b></span>
@@ -150,7 +150,7 @@
     // -----------------------------
     // Release badge
     // -----------------------------
-    const RELEASE = '0.9.7';
+    const RELEASE = '0.9.8';
     const BUILD_TIME = new Date().toISOString();
     const vb = document.getElementById('versionBadge');
     if(vb){ vb.textContent = `🧾 v${RELEASE}`; vb.title = `Build ${BUILD_TIME}`; }
@@ -290,6 +290,9 @@
       setBadge(runState, 'starting');
       log('🎥 Richiesta accesso camera…');
 
+      if(!window.isSecureContext){
+        log('⚠️ Contesto non sicuro: su iOS la camera richiede HTTPS.');
+      }
       if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
         camState.textContent = 'non supportata';
         setBadge(runState, 'blocked');
@@ -297,9 +300,51 @@
         return;
       }
 
+      // Ensure attributes that make iOS Safari happier
+      video.setAttribute('playsinline', '');
+      video.muted = true;
+
+      // Stop any prior stream
+      try{ if(stream){ stream.getTracks().forEach(t => t.stop()); } }catch{}
+      stream = null;
+
+      // Try a sequence of constraints (environment camera first, then simpler fallbacks)
+      const attempts = [
+        { video: { facingMode: { ideal: 'environment' } }, audio: false },
+        { video: { facingMode: 'environment' }, audio: false },
+        { video: true, audio: false }
+      ];
+
+      let lastErr = null;
+      for(const constraints of attempts){
+        try{
+          log('… tentativo con vincoli: ' + JSON.stringify(constraints.video));
+          stream = await navigator.mediaDevices.getUserMedia(constraints);
+          break;
+        }catch(err){
+          lastErr = err;
+          log(`… fallito: ${err.name}${err.message ? ' — ' + err.message : ''}`);
+        }
+      }
+
+      if(!stream){
+        camState.textContent = 'errore';
+        setBadge(runState, 'blocked');
+        const name = lastErr?.name || 'Error';
+        log(`❌ Impossibile avviare la camera: ${name}`);
+        if(name === 'NotAllowedError' || name === 'SecurityError'){
+          log('Suggerimento: su iPhone vai in Impostazioni → Safari → Fotocamera, oppure nelle impostazioni del sito in Safari e abilita la camera.');
+        }
+        if(name === 'NotFoundError'){
+          log('Suggerimento: nessuna camera trovata (o bloccata). Prova a chiudere altre app che usano la camera.');
+        }
+        console.error(lastErr);
+        return;
+      }
+
       try{
-        stream = await navigator.mediaDevices.getUserMedia({ video:true, audio:false });
         video.srcObject = stream;
+        // iOS: play() may still reject if not in a direct user gesture; here we are in a click handler.
         await video.play();
 
         camState.textContent = 'attiva';
@@ -311,7 +356,8 @@
       }catch(err){
         camState.textContent = 'errore';
         setBadge(runState, 'blocked');
-        log(`❌ Errore camera: ${err.name}${err.message ? ' — ' + err.message : ''}`);
+        log(`❌ Camera stream ok ma video non parte: ${err.name}${err.message ? ' — ' + err.message : ''}`);
+        log('Suggerimento: su iOS tocca una volta lo schermo e riprova, oppure ricarica la pagina con ?v=... per evitare cache.');
         console.error(err);
       }
     }
@@ -515,7 +561,7 @@
 
     // Boot
     selfCheck();
-    log(`✅ Pagina pronta — Release ${RELEASE}. 1) Avvia fotocamera  2) Incolla MODEL_URL  3) Carica modello  4) Riconoscimento continuo`);
+    log(`✅ Pagina pronta — Release ${RELEASE}. 1) Avvia fotocamera (iOS-safe)  2) Incolla MODEL_URL  3) Carica modello  4) Riconoscimento continuo`);  2) Incolla MODEL_URL  3) Carica modello  4) Riconoscimento continuo`);
   </script>
 </body>
 </html>
