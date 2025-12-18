@@ -126,31 +126,110 @@
   </div>
 
   <script>
-    // =============================
-    // Giardino delle Voci — Zero-App
-    // Release: 0.9.7
-    // Engine: Teachable Machine Image (tmImage) + TFJS (pinned)
-    // =============================
+  // =============================
+  // Giardino delle Voci — Zero-App
+  // Release: 0.9.9 (camera+boot hardening)
+  // =============================
 
-    // -----------------------------
-    // Robust logging (avoid “silent” failures)
-    // -----------------------------
-    // If anything breaks before the log panel is available, we still log to console.
-    let logEl = null;
-    const debugOverlay = document.createElement('div');
-    debugOverlay.style.cssText = 'position:fixed;left:10px;bottom:10px;z-index:9999;background:rgba(0,0,0,.75);color:#fff;padding:6px 8px;
+  // Always-on tiny overlay (even if the log panel isn't available)
+  const RELEASE = '0.9.9';
+  const BUILD_TIME = new Date().toISOString();
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;left:10px;bottom:10px;z-index:9999;background:rgba(0,0,0,.75);color:#fff;padding:6px 8px;border-radius:10px;font:12px ui-monospace,Menlo,monospace;max-width:90vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+  overlay.textContent = `boot… v${RELEASE}`;
 
-    // -----------------------------
-    // Release badge
-    // -----------------------------
-    const RELEASE = '0.9.8';
-    const BUILD_TIME = new Date().toISOString();
+  function mountOverlay(){
+    try{
+      if(!document.body) return;
+      if(!document.body.contains(overlay)) document.body.appendChild(overlay);
+    }catch{}
+  }
+
+  function log(msg){
+    const t = new Date().toLocaleTimeString();
+    mountOverlay();
+    overlay.textContent = `[${t}] ${msg}`;
+    try{
+      const logEl = document.getElementById('log');
+      if(logEl) logEl.innerHTML = `[${t}] ${msg}<br>` + logEl.innerHTML;
+    }catch{}
+    try{ console.log(msg); }catch{}
+  }
+
+  window.addEventListener('error', (e) => {
+    log(`💥 JS error: ${e.message || 'unknown'}`);
+  });
+  window.addEventListener('unhandledrejection', (e) => {
+    log(`💥 Promise rejection: ${e.reason?.message || e.reason || 'unknown'}`);
+  });
+
+  // --- ML libs (Teachable Machine runtime) ---
+  let libsReady = false;
+  const TFJS_URLS = [
+    'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js',
+    'https://unpkg.com/@tensorflow/tfjs@3.21.0/dist/tf.min.js'
+  ];
+  const TMIMAGE_URLS = [
+    './vendor/teachablemachine-image.min.js',
+    'https://unpkg.com/@teachablemachine/image@0.8.5/dist/teachablemachine-image.min.js',
+    'https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8.5/dist/teachablemachine-image.min.js'
+  ];
+
+  function loadScriptOnce(src){
+    return new Promise((resolve, reject) => {
+      const already = [...document.scripts].some(s => (s.src || '') === src || (s.src || '').endsWith(src.replace('./','')));
+      if(already){ resolve(); return; }
+      const s = document.createElement('script');
+      s.src = src;
+      s.async = true;
+      s.crossOrigin = 'anonymous';
+      s.referrerPolicy = 'no-referrer';
+      s.onload = () => resolve();
+      s.onerror = () => reject(new Error('Failed to load ' + src));
+      document.head.appendChild(s);
+    });
+  }
+
+  async function tryLoadAny(urls, label){
+    for(const u of urls){
+      try{
+        log(`… provo ${label}: ${u}`);
+        await loadScriptOnce(u);
+        return u;
+      }catch(_e){
+        log(`… fallito ${label}: ${u}`);
+      }
+    }
+    throw new Error(label + ' all sources failed');
+  }
+
+  async function ensureMlLibs(){
+    if(libsReady) return true;
+    log('📦 Caricamento librerie ML (tfjs + tmImage)…');
+    try{
+      await tryLoadAny(TFJS_URLS, 'tfjs');
+      log(`… tfjs ${(typeof window.tf !== 'undefined') ? 'OK' : 'MISSING'}`);
+      await tryLoadAny(TMIMAGE_URLS, 'tmImage');
+      log(`… tmImage ${(typeof window.tmImage !== 'undefined') ? 'OK' : 'MISSING'}`);
+      libsReady = (typeof window.tf !== 'undefined') && (typeof window.tmImage !== 'undefined');
+      if(!libsReady) throw new Error('tfjs/tmImage missing after load');
+      return true;
+    }catch(e){
+      libsReady = false;
+      log(`❌ Impossibile caricare le librerie ML. Dettaglio: ${e.message}`);
+      return false;
+    }
+  }
+
+  // --- App runtime (initialized after DOM is ready) ---
+  document.addEventListener('DOMContentLoaded', () => {
+    mountOverlay();
+
+    // Update version badge if present
     const vb = document.getElementById('versionBadge');
     if(vb){ vb.textContent = `🧾 v${RELEASE}`; vb.title = `Build ${BUILD_TIME}`; }
 
-    // -----------------------------
-    // UI refs
-    // -----------------------------
+    // Resolve UI safely (no early null addEventListener crashes)
     const video = document.getElementById('video');
     const meter = document.getElementById('meter');
     const confEl = document.getElementById('conf');
@@ -166,9 +245,11 @@
     const voiceBtn = document.getElementById('voiceBtn');
     const modelUrlInput = document.getElementById('modelUrl');
 
-    // -----------------------------
-    // Characters
-    // -----------------------------
+    if(!video || !startBtn){
+      log('💥 UI non trovata: controlla che index.html non sia corrotto.');
+      return;
+    }
+
     const CLASSES = {
       Lina: { icon:'🌿', name:'Lina', script:[
         'Ciao, sono Lina la Foglia. Oggi ho danzato con il vento.',
@@ -185,14 +266,11 @@
     };
     const CLASS_KEYS = Object.keys(CLASSES);
 
-    // -----------------------------
-    // Helpers
-    // -----------------------------
-    function setBadge(el, text){ el.textContent = text; }
+    function setBadge(el, text){ if(el) el.textContent = text; }
     function updateMeter(p){
       const pct = Math.max(0, Math.min(1, p));
-      meter.style.width = (pct*100).toFixed(0) + '%';
-      confEl.textContent = (pct*100).toFixed(0) + '%';
+      if(meter) meter.style.width = (pct*100).toFixed(0) + '%';
+      if(confEl) confEl.textContent = (pct*100).toFixed(0) + '%';
     }
     function normalizeLabel(raw){
       const s = String(raw || '').trim();
@@ -203,82 +281,13 @@
       return best;
     }
 
-    // -----------------------------
-    // Runtime state
-    // -----------------------------
     let stream = null;
-    let model = null;          // tmImage model instance
+    let model = null;
     let recognizing = false;
     let synthLock = false;
     let lastSpokenLabel = null;
     let lastSpokenAt = 0;
 
-    // -----------------------------
-    // ML libs (pinned, loaded on demand)
-    // -----------------------------
-    let libsReady = false;
-    const TFJS_URLS = [
-      'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js',
-      'https://unpkg.com/@tensorflow/tfjs@3.21.0/dist/tf.min.js'
-    ];
-    const TMIMAGE_URLS = [
-      './vendor/teachablemachine-image.min.js',
-      'https://unpkg.com/@teachablemachine/image@0.8.5/dist/teachablemachine-image.min.js',
-      'https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8.5/dist/teachablemachine-image.min.js'
-    ];
-
-    function loadScriptOnce(src){
-      return new Promise((resolve, reject) => {
-        const already = [...document.scripts].some(s => (s.src || '') === src || (s.src || '').endsWith(src.replace('./','')));
-        if(already){ resolve(); return; }
-        const s = document.createElement('script');
-        s.src = src;
-        s.async = true;
-        s.crossOrigin = 'anonymous';
-        s.referrerPolicy = 'no-referrer';
-        s.onload = () => resolve();
-        s.onerror = () => reject(new Error('Failed to load ' + src));
-        document.head.appendChild(s);
-      });
-    }
-
-    async function tryLoadAny(urls, label){
-      for(const u of urls){
-        try{
-          log(`… provo ${label}: ${u}`);
-          await loadScriptOnce(u);
-          return u;
-        }catch(_e){
-          log(`… fallito ${label}: ${u}`);
-        }
-      }
-      throw new Error(label + ' all sources failed');
-    }
-
-    async function ensureMlLibs(){
-      if(libsReady) return true;
-      setBadge(runState, 'loading libs');
-      log('📦 Caricamento librerie ML (tfjs + tmImage)…');
-      try{
-        await tryLoadAny(TFJS_URLS, 'tfjs');
-        log(`… tfjs ${(typeof window.tf !== 'undefined') ? 'OK' : 'MISSING'}`);
-
-        await tryLoadAny(TMIMAGE_URLS, 'tmImage');
-        log(`… tmImage ${(typeof window.tmImage !== 'undefined') ? 'OK' : 'MISSING'}`);
-
-        libsReady = (typeof window.tf !== 'undefined') && (typeof window.tmImage !== 'undefined');
-        if(!libsReady) throw new Error('tfjs/tmImage missing after load');
-        return true;
-      }catch(e){
-        libsReady = false;
-        log(`❌ Impossibile caricare le librerie ML. Dettaglio: ${e.message}`);
-        return false;
-      }
-    }
-
-    // -----------------------------
-    // Camera (iOS-safe)
-    // -----------------------------
     async function startCamera(){
       setBadge(runState, 'starting');
       log('🎥 Richiesta accesso camera…');
@@ -287,21 +296,18 @@
         log('⚠️ Contesto non sicuro: su iOS la camera richiede HTTPS.');
       }
       if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
-        camState.textContent = 'non supportata';
+        if(camState) camState.textContent = 'non supportata';
         setBadge(runState, 'blocked');
         log('❌ getUserMedia non supportato in questo browser/contesto.');
         return;
       }
 
-      // Ensure attributes that make iOS Safari happier
-      video.setAttribute('playsinline', '');
+      video.setAttribute('playsinline','');
       video.muted = true;
 
-      // Stop any prior stream
       try{ if(stream){ stream.getTracks().forEach(t => t.stop()); } }catch{}
       stream = null;
 
-      // Try a sequence of constraints (environment camera first, then simpler fallbacks)
       const attempts = [
         { video: { facingMode: { ideal: 'environment' } }, audio: false },
         { video: { facingMode: 'environment' }, audio: false },
@@ -311,7 +317,7 @@
       let lastErr = null;
       for(const constraints of attempts){
         try{
-          log('… tentativo con vincoli: ' + JSON.stringify(constraints.video));
+          log('… tentativo camera: ' + JSON.stringify(constraints.video));
           stream = await navigator.mediaDevices.getUserMedia(constraints);
           break;
         }catch(err){
@@ -321,197 +327,88 @@
       }
 
       if(!stream){
-        camState.textContent = 'errore';
+        if(camState) camState.textContent = 'errore';
         setBadge(runState, 'blocked');
-        const name = lastErr?.name || 'Error';
-        log(`❌ Impossibile avviare la camera: ${name}`);
-        if(name === 'NotAllowedError' || name === 'SecurityError'){
-          log('Suggerimento: su iPhone vai in Impostazioni → Safari → Fotocamera, oppure nelle impostazioni del sito in Safari e abilita la camera.');
-        }
-        if(name === 'NotFoundError'){
-          log('Suggerimento: nessuna camera trovata (o bloccata). Prova a chiudere altre app che usano la camera.');
-        }
-        console.error(lastErr);
+        log(`❌ Impossibile avviare la camera: ${lastErr?.name || 'Error'}`);
         return;
       }
 
       try{
         video.srcObject = stream;
-        // iOS: play() may still reject if not in a direct user gesture; here we are in a click handler.
         await video.play();
-
-        camState.textContent = 'attiva';
+        if(camState) camState.textContent = 'attiva';
         setBadge(runState, 'camera ok');
         log('✅ Camera attiva.');
-
-        stopCamBtn.disabled = false;
-        loadBtn.disabled = false;
+        if(stopCamBtn) stopCamBtn.disabled = false;
+        if(loadBtn) loadBtn.disabled = false;
       }catch(err){
-        camState.textContent = 'errore';
+        if(camState) camState.textContent = 'errore';
         setBadge(runState, 'blocked');
-        log(`❌ Camera stream ok ma video non parte: ${err.name}${err.message ? ' — ' + err.message : ''}`);
-        log('Suggerimento: su iOS tocca una volta lo schermo e riprova, oppure ricarica la pagina con ?v=... per evitare cache.');
-        console.error(err);
+        log(`❌ Stream ok ma video non parte: ${err.name}${err.message ? ' — ' + err.message : ''}`);
       }
     }
 
-    function stopCamera(){
-      stopRecognition(true);
-      if(stream){
-        stream.getTracks().forEach(t => t.stop());
-        stream = null;
-      }
-      video.srcObject = null;
-      camState.textContent = 'non attiva';
-      setBadge(runState, 'idle');
-      log('🛑 Camera fermata.');
-
-      stopCamBtn.disabled = true;
-      loadBtn.disabled = true;
-      runBtn.disabled = true;
-      stopBtn.disabled = true;
+    function stopRecognition(){
+      recognizing = false;
+      if(stopBtn) stopBtn.disabled = true;
+      if(runBtn) runBtn.disabled = (model == null);
+      if(stream) setBadge(runState, model ? 'ready' : 'camera ok');
       updateMeter(0);
     }
 
-    // -----------------------------
-    // Model loading (Teachable Machine)
-    // -----------------------------
+    function stopCamera(){
+      stopRecognition();
+      try{ if(stream){ stream.getTracks().forEach(t => t.stop()); } }catch{}
+      stream = null;
+      video.srcObject = null;
+      if(camState) camState.textContent = 'non attiva';
+      setBadge(runState, 'idle');
+      log('🛑 Camera fermata.');
+      if(stopCamBtn) stopCamBtn.disabled = true;
+      if(loadBtn) loadBtn.disabled = true;
+      if(runBtn) runBtn.disabled = true;
+      if(stopBtn) stopBtn.disabled = true;
+      updateMeter(0);
+    }
+
     async function loadModel(){
       if(!stream){ log('⚠️ Avvia prima la camera.'); return; }
 
-      let url = (modelUrlInput.value || '').trim();
+      let url = (modelUrlInput?.value || '').trim();
       if(!url){ log('⚠️ Inserisci il MODEL_URL.'); return; }
       if(url.endsWith('/')) url = url.slice(0,-1);
       if(!url.endsWith('model.json')) url = url + '/model.json';
       if(!url.startsWith('https://')){ log('⚠️ Il MODEL_URL deve iniziare con https://'); return; }
 
-      const okLibs = await ensureMlLibs();
-      if(!okLibs){
-        mlState.textContent = 'errore';
-        setBadge(runState, 'error');
-        return;
-      }
+      const ok = await ensureMlLibs();
+      if(!ok){ if(mlState) mlState.textContent = 'errore'; setBadge(runState,'error'); return; }
 
       const base = url.replace(/\/model\.json$/,'');
       const modelURL = base + '/model.json';
       const metadataURL = base + '/metadata.json';
 
-      mlState.textContent = 'verifica…';
-      setBadge(runState, 'checking');
-      log('🔎 Verifica model.json / metadata.json…');
-
-      try{
-        const resM = await fetch(modelURL, { method:'GET', cache:'no-store' });
-        if(!resM.ok){
-          mlState.textContent = 'errore';
-          setBadge(runState, 'error');
-          log(`❌ model.json non raggiungibile (HTTP ${resM.status}).`);
-          return;
-        }
-        const resMeta = await fetch(metadataURL, { method:'GET', cache:'no-store' });
-        if(!resMeta.ok){
-          mlState.textContent = 'errore';
-          setBadge(runState, 'error');
-          log(`❌ metadata.json non raggiungibile (HTTP ${resMeta.status}).`);
-          log('Suggerimento: usa l’export TensorFlow.js (hosted) di Teachable Machine.');
-          return;
-        }
-      }catch(e){
-        mlState.textContent = 'errore';
-        setBadge(runState, 'error');
-        log(`❌ Errore rete/CORS nel controllo modello: ${e.message}`);
-        return;
-      }
-
-      mlState.textContent = 'caricamento…';
+      if(mlState) mlState.textContent = 'caricamento…';
       setBadge(runState, 'loading');
       log('🤖 Caricamento modello (tmImage.load)…');
 
       try{
         model = await window.tmImage.load(modelURL, metadataURL);
-        mlState.textContent = 'pronto';
+        if(mlState) mlState.textContent = 'pronto';
         setBadge(runState, 'ready');
         log('✅ Modello caricato.');
-
-        // Optional: list classes (useful for debugging)
-        try{
-          const classes = model.getClassLabels ? model.getClassLabels() : null;
-          if(classes && classes.length){ log('🏷️ Classi modello: ' + classes.join(', ')); }
-        }catch{}
-
-        runBtn.disabled = false;
+        if(runBtn) runBtn.disabled = false;
       }catch(err){
-        mlState.textContent = 'errore';
+        if(mlState) mlState.textContent = 'errore';
         setBadge(runState, 'error');
         log(`❌ Errore caricamento modello: ${err?.message || String(err)}`);
-        if(err?.stack) log('↳ ' + String(err.stack).split('
-')[0]);
-        console.error(err);
       }
     }
 
-    // -----------------------------
-    // Recognition loop
-    // -----------------------------
-    function startRecognition(){
-      if(!model){ log('⚠️ Carica prima il modello.'); return; }
-      recognizing = true;
-      runBtn.disabled = true;
-      stopBtn.disabled = false;
-      setBadge(runState, 'running');
-      log('🧭 Riconoscimento avviato.');
-      loopPredict();
-    }
-
-    function stopRecognition(silent=false){
-      recognizing = false;
-      stopBtn.disabled = true;
-      runBtn.disabled = (model == null);
-      if(stream) setBadge(runState, model ? 'ready' : 'camera ok');
-      if(!silent) log('🛑 Riconoscimento fermato.');
-      updateMeter(0);
-    }
-
-    function loopPredict(){
-      if(!recognizing || !model) return;
-      model.predict(video).then((preds) => {
-        if(!preds || !preds.length){ requestAnimationFrame(loopPredict); return; }
-        let top = preds[0];
-        for(const p of preds){ if(p.probability > top.probability) top = p; }
-
-        const conf = top.probability || 0;
-        const label = normalizeLabel(top.className);
-        updateMeter(conf);
-
-        const now = Date.now();
-        const minGapMs = 2800;
-        const isNew = (label !== lastSpokenLabel) || (now - lastSpokenAt > 12000);
-
-        if(conf >= 0.85 && CLASSES[label] && isNew && (now - lastSpokenAt > minGapMs)){
-          speakOnce(label, conf);
-          lastSpokenLabel = label;
-          lastSpokenAt = now;
-        }
-
-        requestAnimationFrame(loopPredict);
-      }).catch((err) => {
-        console.error(err);
-        requestAnimationFrame(loopPredict);
-      });
-    }
-
-    // -----------------------------
-    // Speech
-    // -----------------------------
     function speak(text){
-      if(!('speechSynthesis' in window)){
-        log('🔈 Sintesi vocale non supportata.');
-        return;
-      }
+      if(!('speechSynthesis' in window)) return;
       const u = new SpeechSynthesisUtterance(text);
       u.lang = 'it-IT';
       u.rate = 0.95;
-      u.pitch = 1.0;
       window.speechSynthesis.cancel();
       window.speechSynthesis.speak(u);
     }
@@ -519,6 +416,7 @@
     function speakOnce(label, conf){
       if(synthLock) return;
       const c = CLASSES[label];
+      if(!c) return;
       const line = c.script[Math.floor(Math.random()*c.script.length)];
       log(`${c.icon} <${c.name}> (${(conf*100).toFixed(0)}%): ${line}`);
       speak(`${c.name} dice: ${line}`);
@@ -526,35 +424,61 @@
       setTimeout(() => { synthLock = false; }, 2400);
     }
 
+    function loopPredict(){
+      if(!recognizing || !model) return;
+      model.predict(video).then((preds) => {
+        if(preds && preds.length){
+          let top = preds[0];
+          for(const p of preds){ if(p.probability > top.probability) top = p; }
+          const conf = top.probability || 0;
+          const label = normalizeLabel(top.className);
+          updateMeter(conf);
+
+          const now = Date.now();
+          const minGapMs = 2800;
+          const isNew = (label !== lastSpokenLabel) || (now - lastSpokenAt > 12000);
+
+          if(conf >= 0.85 && CLASSES[label] && isNew && (now - lastSpokenAt > minGapMs)){
+            speakOnce(label, conf);
+            lastSpokenLabel = label;
+            lastSpokenAt = now;
+          }
+        }
+        requestAnimationFrame(loopPredict);
+      }).catch((_err) => requestAnimationFrame(loopPredict));
+    }
+
+    function startRecognition(){
+      if(!model){ log('⚠️ Carica prima il modello.'); return; }
+      recognizing = true;
+      if(runBtn) runBtn.disabled = true;
+      if(stopBtn) stopBtn.disabled = false;
+      setBadge(runState, 'running');
+      log('🧭 Riconoscimento avviato.');
+      loopPredict();
+    }
+
     function testVoice(){
       speak('Ciao. Questa è una prova voce del Giardino delle Voci.');
       log('🔊 Test voce eseguito.');
     }
 
-    // -----------------------------
-    // Self-check + wiring
-    // -----------------------------
-    function selfCheck(){
-      log(`🧪 Self-check: secureContext=${window.isSecureContext} | mediaDevices=${!!navigator.mediaDevices} | speech=${'speechSynthesis' in window}`);
-      if(!window.isSecureContext){
-        log('⚠️ Contesto non sicuro: su iOS la camera richiede HTTPS.');
-      }
-    }
-
+    // Wiring (safe)
     startBtn.addEventListener('click', startCamera);
-    stopCamBtn.addEventListener('click', stopCamera);
-    loadBtn.addEventListener('click', loadModel);
-    runBtn.addEventListener('click', startRecognition);
-    stopBtn.addEventListener('click', () => stopRecognition(false));
-    voiceBtn.addEventListener('click', testVoice);
+    if(stopCamBtn) stopCamBtn.addEventListener('click', stopCamera);
+    if(loadBtn) loadBtn.addEventListener('click', loadModel);
+    if(runBtn) runBtn.addEventListener('click', startRecognition);
+    if(stopBtn) stopBtn.addEventListener('click', stopRecognition);
+    if(voiceBtn) voiceBtn.addEventListener('click', testVoice);
 
     document.querySelectorAll('.quick').forEach(btn => {
       btn.addEventListener('click', () => speakOnce(btn.dataset.label, 1));
     });
 
-    // Boot
-    selfCheck();
-    log(`✅ Pagina pronta — Release ${RELEASE}. 1) Avvia fotocamera (iOS-safe)  2) Incolla MODEL_URL  3) Carica modello  4) Riconoscimento continuo`);  2) Incolla MODEL_URL  3) Carica modello  4) Riconoscimento continuo`);
-  </script>
+    // Initial UI state
+    setBadge(runState, 'idle');
+    log(`✅ Pagina pronta — Release ${RELEASE}. Premi “Avvia fotocamera”.`);
+  });
+</script>
 </body>
 </html>
