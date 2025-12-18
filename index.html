@@ -136,6 +136,9 @@
     </footer>
   </div>
 
+  <!-- TensorFlow.js first (ml5 depends on it in many builds) -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <!-- ml5.js -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/ml5/0.12.2/ml5.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <script>
     // -----------------------------
@@ -299,6 +302,12 @@
       log('🤖 Caricamento modello (ml5.imageClassifier)…');
 
       try{
+        if(typeof window.ml5 === 'undefined'){
+          mlState.textContent = 'errore';
+          setBadge(runState, 'error');
+          log('❌ ml5 non è disponibile. Verifica che gli script tfjs/ml5 si carichino (nessun blocker/Content-Security).');
+          return;
+        }
         classifier = ml5.imageClassifier(url, video, () => {
           mlState.textContent = 'pronto';
           setBadge(runState, 'ready');
@@ -308,7 +317,9 @@
       } catch (err){
         mlState.textContent = 'errore';
         setBadge(runState, 'error');
-        log(`❌ Errore durante l’inizializzazione del modello: ${err.name || err}`);
+        log(`❌ Errore durante l’inizializzazione del modello: ${err?.name || 'Error'} — ${err?.message || String(err)}`);
+        if(err?.stack){ log('↳ Stack (prima riga): ' + String(err.stack).split('
+')[0]); }
         console.error(err);
       }
     }
@@ -414,8 +425,12 @@
     // -----------------------------
     function selfCheck(){
       const secure = window.isSecureContext;
-      log(`🧪 Self‑check: secureContext=${secure} | hasMediaDevices=${!!navigator.mediaDevices} | hasSpeech=${'speechSynthesis' in window}`);
+      const hasTF = (typeof window.tf !== 'undefined');
+      const hasML5 = (typeof window.ml5 !== 'undefined');
+      log(`🧪 Self-check: secureContext=${secure} | mediaDevices=${!!navigator.mediaDevices} | speech=${'speechSynthesis' in window} | tfjs=${hasTF} | ml5=${hasML5}`);
       if(!secure){ log('⚠️ Attenzione: il contesto non è sicuro. Su iOS la camera richiede HTTPS.'); }
+      if(!hasTF){ log('⚠️ TensorFlow.js non caricato (tf è undefined).'); }
+      if(!hasML5){ log('⚠️ ml5 non caricato (ml5 è undefined).'); }
     }
 
     // Wiring
