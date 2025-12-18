@@ -61,7 +61,7 @@
         <p class="sub">Camera iOS‑safe + modello pre‑addestrato (Teachable Machine / TensorFlow.js) + voce sintetica. Nessuna app nativa. Il modello ML viene caricato <b>solo</b> quando premi “Carica modello”, così un eventuale blocco CDN non impedisce l’avvio camera.</p>
       </div>
       <div class="row">
-        <span class="badge" id="versionBadge">🧾 v0.9.5</span>
+        <span class="badge" id="versionBadge">🧾 v0.9.6</span>
         <span class="badge">🎥 Camera <b id="camState">non attiva</b></span>
         <span class="badge">🤖 Modello <b id="mlState">non caricato</b></span>
         <span class="badge">🧠 Stato <b id="runState">idle</b></span>
@@ -193,15 +193,17 @@
     // -----------------------------
     let libsReady = false;
     const TFJS_URLS = [
-      'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js',
-      'https://unpkg.com/@tensorflow/tfjs@4.20.0/dist/tf.min.js'
+      // Pinned for ml5 0.12.x compatibility
+      'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js',
+      'https://unpkg.com/@tensorflow/tfjs@3.21.0/dist/tf.min.js'
     ];
     // ml5 is sometimes blocked on cdnjs; provide multiple mirrors (and allow a local copy).
     const ML5_URLS = [
+      // Prefer local copy for reliability
       './vendor/ml5.min.js',
+      // Public mirrors (pinned)
       'https://unpkg.com/ml5@0.12.2/dist/ml5.min.js',
-      'https://cdn.jsdelivr.net/npm/ml5@0.12.2/dist/ml5.min.js',
-      'https://cdnjs.cloudflare.com/ajax/libs/ml5/0.12.2/ml5.min.js'
+      'https://cdn.jsdelivr.net/npm/ml5@0.12.2/dist/ml5.min.js'
     ];
 
     function loadScriptOnce(src){
@@ -500,7 +502,7 @@
     });
 
     // Boot
-    const RELEASE = '0.9.5';
+    const RELEASE = '0.9.6';
     const BUILD_TIME = new Date().toISOString();
     const vb = document.getElementById('versionBadge');
     if(vb){ vb.textContent = `🧾 v${RELEASE}`; vb.title = `Build ${BUILD_TIME}`; }
