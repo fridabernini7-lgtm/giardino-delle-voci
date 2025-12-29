@@ -1,1 +1,375 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b1024" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>PRM · Albero 8-bit</title>
+  <style>
+    :root{color-scheme:dark;--stroke:rgba(255,255,255,.14);--panel:rgba(10,14,28,.62);--text:#e7ecff;--muted:rgba(231,236,255,.75);--btn:rgba(255,255,255,.08);--btn2:rgba(255,255,255,.12);}
+    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+    html,body{height:100%;margin:0;}
+    body{font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial;color:var(--text);overflow:hidden;background:#070a14;}
+    canvas{position:fixed;inset:0;width:100vw;height:100vh;display:block;image-rendering:pixelated;image-rendering:crisp-edges;touch-action:none;}
+    header{position:fixed;left:calc(10px + env(safe-area-inset-left));right:calc(10px + env(safe-area-inset-right));top:calc(10px + env(safe-area-inset-top));z-index:10;display:flex;gap:10px;align-items:flex-start;pointer-events:none;}
+    .brand{width:44px;height:44px;border-radius:14px;border:1px solid rgba(255,255,255,.18);box-shadow:0 10px 30px rgba(0,0,0,.25);background-size:cover;background-position:center;background-image:url("data:image/png;base64,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");flex:0 0 auto;}
+    .titles{display:flex;flex-direction:column;gap:4px;max-width:52ch;}
+    h1{margin:0;font-size:18px;letter-spacing:.3px;line-height:1.1;}
+    .hint{font-size:12px;color:var(--muted);line-height:1.25;max-width:44ch;}
+    .hud{position:fixed;left:calc(10px + env(safe-area-inset-left));right:calc(10px + env(safe-area-inset-right));bottom:calc(10px + env(safe-area-inset-bottom));z-index:10;display:flex;flex-direction:column;gap:8px;}
+    .sliders{display:flex;gap:10px;padding:10px 12px;border-radius:14px;border:1px solid var(--stroke);background:var(--panel);backdrop-filter:blur(10px);}
+    .slider{flex:1;min-width:0;}
+    .slider label{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:6px;}
+    input[type="range"]{width:100%;}
+    .row{display:flex;gap:8px;}
+    .btn{flex:1;border-radius:14px;border:1px solid var(--stroke);background:var(--btn);color:var(--text);padding:12px 12px;font-size:14px;display:flex;align-items:center;justify-content:center;gap:8px;user-select:none;}
+    .btn:active{background:var(--btn2);transform:translateY(1px);}
+    .btn.small{flex:0 0 auto;padding:12px 14px;min-width:52px;}
+    .btn[aria-pressed="true"]{outline:2px solid rgba(255,255,255,.22);}
+    .toast{position:fixed;left:calc(10px + env(safe-area-inset-left));right:calc(10px + env(safe-area-inset-right));top:calc(70px + env(safe-area-inset-top));margin:auto;max-width:520px;border-radius:14px;border:1px solid var(--stroke);background:rgba(10,14,28,.74);padding:10px 12px;font-size:13px;color:var(--text);backdrop-filter:blur(10px);display:none;z-index:11;}
+    .toast.show{display:block;}
+  </style>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <header>
+    <div class="brand" aria-hidden="true"></div>
+    <div class="titles">
+      <h1>PRM · Albero di Natale 8-bit</h1>
+      <div class="hint">Un esperimento visivo interattivo in stile 8-bit.</div>
+    </div>
+  </header>
 
+  <div class="toast" id="toast"></div>
+
+  <div class="hud">
+    <div class="sliders">
+      <div class="slider">
+        <label><span>Pixel</span><span id="pxVal">12</span></label>
+        <input id="pixel" type="range" min="7" max="18" value value="12" step="1" />
+      </div>
+      <div class="slider">
+        <label><span>Neve</span><span id="snowVal">140</span></label>
+        <input id="snow" type="range" min="0" max="240" value="140" step="10" />
+      </div>
+      <div class="slider">
+        <label><span>Luci</span><span id="blinkVal">1.2</span></label>
+        <input id="blink" type="range" min="0.2" max="2.5" value="1.2" step="0.1" />
+      </div>
+    </div>
+
+    <div class="row">
+      <button class="btn" id="pause" aria-pressed="false">⏸️ Pausa</button>
+      <button class="btn" id="lights" aria-pressed="true">💡 Luci</button>
+      <button class="btn" id="snowOn" aria-pressed="true">❄️ Neve</button>
+      <button class="btn small" id="rand" title="Random">🎲</button>
+    </div>
+
+    <div class="row">
+      <button class="btn" id="share">📤 Condividi PNG</button>
+      <button class="btn" id="homehint">➕ Home (istruzioni)</button>
+    </div>
+  </div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d', { alpha:true });
+
+  const ui = {
+    pixel: document.getElementById('pixel'),
+    snow: document.getElementById('snow'),
+    blink: document.getElementById('blink'),
+    pxVal: document.getElementById('pxVal'),
+    snowVal: document.getElementById('snowVal'),
+    blinkVal: document.getElementById('blinkVal'),
+    pause: document.getElementById('pause'),
+    lights: document.getElementById('lights'),
+    snowOn: document.getElementById('snowOn'),
+    rand: document.getElementById('rand'),
+    share: document.getElementById('share'),
+    homehint: document.getElementById('homehint'),
+    toast: document.getElementById('toast')
+  };
+
+  const palettes = [
+    { name:'classic', sky1:'#0b1024', sky2:'#070a14', ground1:'#0b1a16', ground2:'#08110f',
+       treeDark:'#0b4a2d', treeMid:'#0e6a3f', treeLight:'#13a35e', trunk:'#7a4b28',
+       star1:'#ffe7a6', star2:'#ffd15c', ornaments:['#ff4d6d','#ffd166','#4dd4ff','#b9ff6a','#c77dff'],
+       garland:'#ffcc66', snow:'#eaf2ff', text:'#e7ecff' },
+    { name:'ice', sky1:'#07162a', sky2:'#050a12', ground1:'#0a1420', ground2:'#060d16',
+       treeDark:'#0e3a54', treeMid:'#14688f', treeLight:'#25b6d6', trunk:'#5e4a3a',
+       star1:'#eaf7ff', star2:'#b8e8ff', ornaments:['#9bf6ff','#bdb2ff','#ffd6a5','#a0c4ff','#caffbf'],
+       garland:'#c8f3ff', snow:'#f4fbff', text:'#eaf7ff' },
+    { name:'retro', sky1:'#1b0f2e', sky2:'#090615', ground1:'#1f1236', ground2:'#120a22',
+       treeDark:'#1d6b4f', treeMid:'#2aa876', treeLight:'#7cf4a3', trunk:'#a36a43',
+       star1:'#fff1a8', star2:'#ffd93d', ornaments:['#ff0054','#00f5d4','#f15bb5','#fee440','#9b5de5'],
+       garland:'#ffd93d', snow:'#fff7ff', text:'#ffeaff' }
+  ];
+  let pal = palettes[0];
+
+  function clamp(n,a,b){ return Math.max(a, Math.min(b,n)); }
+  function rand(min,max){ return min + Math.random()*(max-min); }
+  function randi(min,max){ return Math.floor(rand(min,max+1)); }
+  function hexToRgb(h){ const x=h.replace('#',''); return { r:parseInt(x.slice(0,2),16), g:parseInt(x.slice(2,4),16), b:parseInt(x.slice(4,6),16) }; }
+  function shade(hex,d){ const c=hexToRgb(hex); return `rgb(${clamp(c.r+d,0,255)},${clamp(c.g+d,0,255)},${clamp(c.b+d,0,255)})`; }
+
+  let running=true, lightsOn=true, snowOn=true, t=0;
+  let pixelSize=+ui.pixel.value, snowCount=+ui.snow.value, blinkSpeed=+ui.blink.value;
+  let wind=0, windTarget=0, dragActive=false;
+  const extraOrbs=[];
+  let snow=[];
+
+  function px(x,y,c){ ctx.fillStyle=c; ctx.fillRect(Math.round(x)*pixelSize, Math.round(y)*pixelSize, pixelSize, pixelSize); }
+  function rect(x,y,w,h,c){ ctx.fillStyle=c; ctx.fillRect(Math.round(x)*pixelSize, Math.round(y)*pixelSize, Math.round(w)*pixelSize, Math.round(h)*pixelSize); }
+
+  function sizeCanvas(){ 
+    pixelSize=+ui.pixel.value;
+    const w=Math.max(320, window.innerWidth||390);
+    const h=Math.max(480, window.innerHeight||844);
+    const bw=Math.max(160, Math.floor(w/pixelSize));
+    const bh=Math.max(90, Math.floor(h/pixelSize));
+    canvas.width=bw*pixelSize; canvas.height=bh*pixelSize;
+    ctx.imageSmoothingEnabled=false;
+  }
+
+  function resetSnow(){ 
+    snowCount=+ui.snow.value;
+    const wpx=canvas.width/pixelSize, hpx=canvas.height/pixelSize;
+    snow=Array.from({length:snowCount}, ()=>({ x:rand(0,wpx), y:rand(0,hpx), v:rand(6,22)/60, s:Math.random()<0.12?2:1, drift:rand(-0.22,0.22), tw:rand(0,Math.PI*2) }));
+  }
+
+  function gradBands(y0,y1,cA,cB){ 
+    const yStart=Math.floor(y0), yEnd=Math.floor(y1);
+    for(let y=yStart;y<yEnd;y++){ 
+      const k=(y-yStart)/Math.max(1,(yEnd-yStart-1));
+      const a=hexToRgb(cA), b=hexToRgb(cB);
+      const r=Math.round(a.r*(1-k)+b.r*k), g=Math.round(a.g*(1-k)+b.g*k), bl=Math.round(a.b*(1-k)+b.b*k);
+      ctx.fillStyle=`rgb(${r},${g},${bl})`;
+      ctx.fillRect(0, y*pixelSize, canvas.width, pixelSize);
+    }
+  }
+
+  function drawStars(){ 
+    const wpx=canvas.width/pixelSize, hpx=canvas.height/pixelSize, topH=Math.floor(hpx*0.55);
+    const n=Math.floor(wpx*0.6);
+    for(let i=0;i<n;i++){ 
+      const x=(i*37)%Math.floor(wpx), y=(i*19)%Math.max(1,topH);
+      if(i%7===0||i%11===0) px(x,y,'#ffffff');
+      if(i%23===0) px(x,y,'#cfd8ff');
+    }
+  }
+
+  function drawMoon(){ 
+    const wpx=canvas.width/pixelSize;
+    const mx=Math.floor(wpx*0.82);
+    const my=Math.floor((canvas.height/pixelSize)*0.10);
+    const moon='#cfd8ff';
+    for(let y=-6;y<=6;y++) for(let x=-6;x<=6;x++) if(x*x+y*y<=36) px(mx+x,my+y,moon);
+    for(let y=-6;y<=6;y++) for(let x=-6;x<=6;x++) if((x+2)*(x+2)+(y+1)*(y+1)<=36) px(mx+x,my+y,pal.sky1);
+  }
+
+  function drawStar(cx,cy){ 
+    const on=lightsOn?(Math.sin(t*blinkSpeed*1.2)>-0.2):true;
+    const a=on?pal.star1:shade(pal.star1,-50), b=on?pal.star2:shade(pal.star2,-60);
+    const pts=[[0,0,a],[-1,0,b],[1,0,b],[0,-1,b],[0,1,b],[-2,0,a],[2,0,a],[0,-2,a],[0,2,a],[-1,-1,a],[1,-1,a],[-1,1,a],[1,1,a]];
+    for(const [dx,dy,c] of pts) px(cx+dx, cy+dy, c);
+  }
+
+  function drawOrb(x,y,col,on){ 
+    const base=on?col:shade(col,-70), hi=on?shade(col,35):shade(col,-40);
+    px(x,y,hi); px(x+1,y,base); px(x,y+1,base); px(x+1,y+1,base);
+    px(x,y-1,pal.garland);
+  }
+
+  function drawGreeting(){ 
+    const msg="Buone Feste";
+    
+    const hpx=canvas.height/pixelSize;
+    
+  }
+
+  function drawTree(){ 
+    const wpx=canvas.width/pixelSize, hpx=canvas.height/pixelSize, cx=Math.floor(wpx/2);
+    const top=Math.floor(hpx*0.16), treeH=Math.floor(hpx*0.58), levels=6, step=Math.max(5, Math.floor(treeH/(levels+2)));
+    const maxW=clamp(Math.floor(wpx*0.30),34,56), minW=clamp(Math.floor(maxW*0.25),9,16);
+
+    for(let i=0;i<levels;i++){ 
+      const y0=top+i*step;
+      const w=Math.floor(minW + (maxW-minW)*(i/(levels-1)));
+      const half=Math.floor(w/2);
+      for(let dy=0;dy<step;dy++){ 
+        const rowW=clamp(w-dy*2,1,w), rowHalf=Math.floor(rowW/2);
+        for(let x=-rowHalf;x<=rowHalf;x++){ 
+          const edge=Math.abs(x)>=rowHalf-1;
+          const col=edge?pal.treeDark:(dy<=Math.floor(step*0.35)?pal.treeLight:pal.treeMid);
+          px(cx+x,y0+dy,col);
+        }
+      }
+      px(cx-half-1, y0+Math.floor(step/2), pal.treeDark);
+      px(cx+half+1, y0+Math.floor(step/2), pal.treeDark);
+      const capY=y0+1, capW=w-4, capHalf=Math.floor(capW/2);
+      for(let x=-capHalf;x<=capHalf;x++) if((x+i)%3===0) px(cx+x, capY, shade(pal.snow,-6));
+    }
+
+    const trunkY=top+levels*step+1;
+    rect(cx-3,trunkY,7,9,pal.trunk);
+    rect(cx-1,trunkY+1,2,6,shade(pal.trunk,18));
+
+    for(let y=top+Math.floor(step*1.2); y<trunkY-2; y++){ 
+      const x=cx + Math.round(Math.sin((y-top)/5) * clamp(Math.floor(wpx*0.06),8,14));
+      if(y%2===0) px(x,y,pal.garland);
+    }
+
+    const baseOrbs=[{x:cx-6,y:top+step*1},{x:cx+5,y:top+step*1+4},{x:cx-10,y:top+step*2+2},{x:cx+9,y:top+step*2+4},{x:cx-4,y:top+step*3+3},{x:cx+2,y:top+step*4-1}];
+    const blink=(u)=> (Math.sin(t*blinkSpeed+u)>0.15);
+    for(let i=0;i<baseOrbs.length;i++){ 
+      const col=pal.ornaments[i%pal.ornaments.length];
+      const on=lightsOn?blink(i*1.7):true;
+      drawOrb(baseOrbs[i].x, baseOrbs[i].y, col, on);
+    }
+    for(const o of extraOrbs){ 
+      const on=lightsOn?blink(o.phase):true;
+      drawOrb(o.x,o.y,o.color,on);
+    }
+
+    drawStar(cx, top-3);
+    
+  }
+
+  function drawSnow(){ 
+    if(!snowOn) return;
+    for(const s of snow){ 
+      const tw=(Math.sin(t*1.7+s.tw)>0.6)?1:0;
+      const col=tw?shade(pal.snow,10):pal.snow;
+      px(s.x,s.y,col);
+      if(s.s===2) px(s.x+1,s.y,col);
+    }
+  }
+
+  function stepSnow(dt){ 
+    if(!snowOn) return;
+    const wpx=canvas.width/pixelSize, hpx=canvas.height/pixelSize;
+    wind += (windTarget-wind) * clamp(dt*6,0,1);
+    for(const s of snow){ 
+      s.y += s.v*dt*60;
+      s.x += (s.drift + wind*0.9)*dt*60;
+      if(s.y>hpx){ s.y=-2; s.x=rand(0,wpx); }
+      if(s.x<-2) s.x=wpx+2;
+      if(s.x>wpx+2) s.x=-2;
+    }
+  }
+
+  function vignette(){ 
+    for(let i=0;i<6;i++){ 
+      const a=0.06+i*0.02;
+      ctx.fillStyle=`rgba(0,0,0,${a})`;
+      ctx.fillRect(i*pixelSize,i*pixelSize,canvas.width-i*2*pixelSize,pixelSize);
+      ctx.fillRect(i*pixelSize,canvas.height-(i+1)*pixelSize,canvas.width-i*2*pixelSize,pixelSize);
+      ctx.fillRect(i*pixelSize,i*pixelSize,pixelSize,canvas.height-i*2*pixelSize);
+      ctx.fillRect(canvas.width-(i+1)*pixelSize,i*pixelSize,pixelSize,canvas.height-i*2*pixelSize);
+    }
+  }
+
+  function render(){ 
+    const hpx=canvas.height/pixelSize;
+    gradBands(0,hpx*0.72,pal.sky1,pal.sky2);
+    drawStars(); drawMoon();
+    gradBands(hpx*0.72,hpx,pal.ground1,pal.ground2);
+    drawTree(); drawSnow(); vignette();
+  }
+
+  let toastTimer=null;
+  function toast(msg){ 
+    ui.toast.textContent=msg;
+    ui.toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer=setTimeout(()=>ui.toast.classList.remove('show'),2400);
+  }
+
+  async function sharePng(){ 
+    try{
+      const blob=await new Promise(res=>canvas.toBlob(res,'image/png'));
+      const file=new File([blob],'prm-albero-8bit.png',{type:'image/png'});
+      if(navigator.canShare && navigator.canShare({files:[file]})){ 
+        await navigator.share({title:'PRM · Albero 8-bit', text:'Buone Feste 🎄', files:[file]});
+        return;
+      }
+      const url=URL.createObjectURL(blob);
+      window.open(url,'_blank');
+      toast('Aperto PNG: tieni premuto per salvarlo.');
+    } catch(e) {
+      toast('Condivisione non disponibile (aprire in Safari).');
+    }
+  }
+
+  function syncLabels(){ ui.pxVal.textContent=ui.pixel.value; ui.snowVal.textContent=ui.snow.value; ui.blinkVal.textContent=ui.blink.value; }
+
+  ui.pixel.addEventListener('input',()=>{ syncLabels(); sizeCanvas(); resetSnow(); });
+  ui.snow.addEventListener('input',()=>{ syncLabels(); resetSnow(); });
+  ui.blink.addEventListener('input',()=>{ syncLabels(); blinkSpeed=+ui.blink.value; });
+
+  ui.pause.addEventListener('click',()=>{ running=!running; ui.pause.setAttribute('aria-pressed',String(!running)); ui.pause.textContent=running?'⏸️ Pausa':'▶️ Riprendi'; });
+  ui.lights.addEventListener('click',()=>{ lightsOn=!lightsOn; ui.lights.setAttribute('aria-pressed',String(lightsOn)); toast(lightsOn?'Luci accese.':'Luci spente.'); });
+  ui.snowOn.addEventListener('click',()=>{ snowOn=!snowOn; ui.snowOn.setAttribute('aria-pressed',String(snowOn)); toast(snowOn?'Neve attiva.':'Neve disattivata.'); });
+  ui.rand.addEventListener('click',()=>{ 
+    ui.pixel.value=randi(7,18); ui.snow.value=randi(40,220); ui.blink.value=(Math.round(rand(0.4,2.3)*10)/10).toFixed(1);
+    pal=palettes[randi(0,palettes.length-1)];
+    blinkSpeed=+ui.blink.value; syncLabels(); sizeCanvas(); resetSnow(); toast('Random: nuova atmosfera.');
+  });
+  ui.share.addEventListener('click', sharePng);
+  ui.homehint.addEventListener('click', ()=>toast('Apri un link in Safari → Condividi → “Aggiungi alla schermata Home”.'));
+
+  function canvasToBase(e){ 
+    const rect=canvas.getBoundingClientRect();
+    const x=(e.clientX-rect.left)*(canvas.width/rect.width);
+    const y=(e.clientY-rect.top)*(canvas.height/rect.height);
+    return {x:x/pixelSize,y:y/pixelSize};
+  }
+  function isTreeEnvelope(x,y){ 
+    const wpx=canvas.width/pixelSize, hpx=canvas.height/pixelSize, cx=wpx/2;
+    const top=Math.floor(hpx*0.16), bottom=top+Math.floor(hpx*0.62);
+    if(y<top-4 || y>bottom) return false;
+    const dx=Math.abs(x-cx);
+    const envelope=(y-top)*0.55 + 8;
+    return dx<envelope;
+  }
+
+  canvas.addEventListener('pointerdown',(e)=>{ 
+    canvas.setPointerCapture(e.pointerId);
+    dragActive=true;
+    const p=canvasToBase(e);
+    if(isTreeEnvelope(p.x,p.y)){ 
+      const col=pal.ornaments[randi(0,pal.ornaments.length-1)];
+      extraOrbs.push({x:Math.round(p.x), y:Math.round(p.y), color:col, phase:rand(0,Math.PI*2)});
+      if(extraOrbs.length>32) extraOrbs.shift();
+    }
+    windTarget=clamp((p.x-(canvas.width/pixelSize)/2)/((canvas.width/pixelSize)/2),-1,1);
+  });
+  canvas.addEventListener('pointermove',(e)=>{ if(!dragActive) return; const p=canvasToBase(e); windTarget=clamp((p.x-(canvas.width/pixelSize)/2)/((canvas.width/pixelSize)/2),-1,1); });
+  canvas.addEventListener('pointerup',()=>{ dragActive=false; windTarget=0; });
+  canvas.addEventListener('pointercancel',()=>{ dragActive=false; windTarget=0; });
+
+  let last=performance.now();
+  function frame(now){ 
+    const dt=(now-last)/1000; last=now;
+    if(running) t+=dt;
+    if(running) stepSnow(dt);
+    render();
+    requestAnimationFrame(frame);
+  }
+
+  syncLabels();
+  sizeCanvas();
+  resetSnow();
+  setTimeout(()=>{ sizeCanvas(); resetSnow(); }, 60);
+  window.addEventListener('orientationchange',()=>setTimeout(()=>{ sizeCanvas(); resetSnow(); }, 120),{passive:true});
+  window.addEventListener('resize',()=>{ sizeCanvas(); resetSnow(); },{passive:true});
+
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
